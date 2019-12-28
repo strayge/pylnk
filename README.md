@@ -1,4 +1,7 @@
-Python library for reading and writing Windows shortcut files (.lnk)
+# PyLink3
+
+Python library for reading and writing Windows shortcut files (.lnk).  
+Converted to support python 3.
 
 This library can parse .lnk files and extract all relevant information from
 them. Parsing a .lnk file yields a LNK object which can be altered and saved
