@@ -19,57 +19,66 @@
 
 # original:
 # https://sourceforge.net/p/pylnk/code/HEAD/tree/trunk/pylnk.py
-import io
-import sys, os, time, re
-from struct import pack, unpack
-from pprint import pformat
+#
+# converted to python3 by strayge:
+# https://github.com/strayge/pylnk
+
+import os
+import re
+import sys
+import time
 from datetime import datetime
 from io import BytesIO
+from pprint import pformat
+from struct import pack, unpack
 
 DEFAULT_CHARSET = 'cp1251'
 
-#---- constants
+# ---- constants
 
 _SIGNATURE = b'L\x00\x00\x00'
 _GUID = b'\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'
 _LINK_INFO_HEADER_DEFAULT = 0x1C
 _LINK_INFO_HEADER_OPTIONAL = 0x24
 
-_LINK_FLAGS = ('HasLinkTargetIDList',
-               'HasLinkInfo',
-               'HasName',
-               'HasRelativePath',
-               'HasWorkingDir',
-               'HasArguments',
-               'HasIconLocation',
-               'IsUnicode',
-               'ForceNoLinkInfo',
-               # new
-               'HasExpString',
-               'RunInSeparateProcess',
-               'Unused1',
-               'HasDarwinID',
-               'RunAsUser',
-               'HasExpIcon',
-               'NoPidlAlias',
-               'Unused2',
-               'RunWithShimLayer',
-               'ForceNoLinkTrack',
-               'EnableTargetMetadata',
-               'DisableLinkPathTracking',
-               'DisableKnownFolderTracking',
-               'DisableKnownFolderAlias',
-               'AllowLinkToLink',
-               'UnaliasOnSave',
-               'PreferEnvironmentPath',
-               'KeepLocalIDListForUNCTarget',
-               )
+_LINK_FLAGS = (
+    'HasLinkTargetIDList',
+    'HasLinkInfo',
+    'HasName',
+    'HasRelativePath',
+    'HasWorkingDir',
+    'HasArguments',
+    'HasIconLocation',
+    'IsUnicode',
+    'ForceNoLinkInfo',
+    # new
+    'HasExpString',
+    'RunInSeparateProcess',
+    'Unused1',
+    'HasDarwinID',
+    'RunAsUser',
+    'HasExpIcon',
+    'NoPidlAlias',
+    'Unused2',
+    'RunWithShimLayer',
+    'ForceNoLinkTrack',
+    'EnableTargetMetadata',
+    'DisableLinkPathTracking',
+    'DisableKnownFolderTracking',
+    'DisableKnownFolderAlias',
+    'AllowLinkToLink',
+    'UnaliasOnSave',
+    'PreferEnvironmentPath',
+    'KeepLocalIDListForUNCTarget',
+)
 
-_FILE_ATTRIBUTES_FLAGS = ('read_only', 'hidden', 'system_file', 'reserved1',
-                         'directory', 'archive', 'reserved2', 'normal',
-                         'temporary', 'sparse_file', 'reparse_point',
-                         'compressed', 'offline', 'not_content_indexed',
-                         'encrypted')
+_FILE_ATTRIBUTES_FLAGS = (
+    'read_only', 'hidden', 'system_file', 'reserved1',
+    'directory', 'archive', 'reserved2', 'normal',
+    'temporary', 'sparse_file', 'reparse_point',
+    'compressed', 'offline', 'not_content_indexed',
+    'encrypted',
+)
 
 _MODIFIER_KEYS = ('SHIFT', 'CONTROL', 'ALT')
 
@@ -95,16 +104,18 @@ _DRIVE_TYPES = {0: DRIVE_UNKNOWN,
                 6: DRIVE_RAMDISK}
 _DRIVE_TYPE_IDS = dict((v, k) for k, v in _DRIVE_TYPES.items())
 
-_KEYS = {0x30: '0', 0x31: '1', 0x32: '2', 0x33: '3', 0x34: '4', 0x35: '5', 0x36: '6',
-        0x37: '7', 0x38: '8', 0x39: '9', 0x41: 'A', 0x42: 'B', 0x43: 'C', 0x44: 'D',
-        0x45: 'E', 0x46: 'F', 0x47: 'G', 0x48: 'H', 0x49: 'I', 0x4A: 'J', 0x4B: 'K',
-        0x4C: 'L', 0x4D: 'M', 0x4E: 'N', 0x4F: 'O', 0x50: 'P', 0x51: 'Q', 0x52: 'R',
-        0x53: 'S', 0x54: 'T', 0x55: 'U', 0x56: 'V', 0x57: 'W', 0x58: 'X', 0x59: 'Y',
-        0x5A: 'Z', 0x70: 'F1', 0x71: 'F2', 0x72: 'F3', 0x73: 'F4', 0x74: 'F5',
-        0x75: 'F6', 0x76: 'F7', 0x77: 'F8', 0x78: 'F9', 0x79: 'F10', 0x7A: 'F11',
-        0x7B: 'F12', 0x7C: 'F13', 0x7D: 'F14', 0x7E: 'F15', 0x7F: 'F16', 0x80: 'F17',
-        0x81: 'F18', 0x82: 'F19', 0x83: 'F20', 0x84: 'F21', 0x85: 'F22', 0x86: 'F23',
-        0x87: 'F24', 0x90: 'NUM LOCK', 0x91: 'SCROLL LOCK'}
+_KEYS = {
+    0x30: '0', 0x31: '1', 0x32: '2', 0x33: '3', 0x34: '4', 0x35: '5', 0x36: '6',
+    0x37: '7', 0x38: '8', 0x39: '9', 0x41: 'A', 0x42: 'B', 0x43: 'C', 0x44: 'D',
+    0x45: 'E', 0x46: 'F', 0x47: 'G', 0x48: 'H', 0x49: 'I', 0x4A: 'J', 0x4B: 'K',
+    0x4C: 'L', 0x4D: 'M', 0x4E: 'N', 0x4F: 'O', 0x50: 'P', 0x51: 'Q', 0x52: 'R',
+    0x53: 'S', 0x54: 'T', 0x55: 'U', 0x56: 'V', 0x57: 'W', 0x58: 'X', 0x59: 'Y',
+    0x5A: 'Z', 0x70: 'F1', 0x71: 'F2', 0x72: 'F3', 0x73: 'F4', 0x74: 'F5',
+    0x75: 'F6', 0x76: 'F7', 0x77: 'F8', 0x78: 'F9', 0x79: 'F10', 0x7A: 'F11',
+    0x7B: 'F12', 0x7C: 'F13', 0x7D: 'F14', 0x7E: 'F15', 0x7F: 'F16', 0x80: 'F17',
+    0x81: 'F18', 0x82: 'F19', 0x83: 'F20', 0x84: 'F21', 0x85: 'F22', 0x86: 'F23',
+    0x87: 'F24', 0x90: 'NUM LOCK', 0x91: 'SCROLL LOCK'
+}
 _KEY_CODES = dict((v, k) for k, v in _KEYS.items())
 
 ROOT_MY_COMPUTER = 'MY_COMPUTER'
@@ -114,21 +125,22 @@ ROOT_NETWORK_SERVER = 'NETWORK_SERVER'
 ROOT_NETWORK_PLACES = 'NETWORK_PLACES'
 ROOT_NETWORK_DOMAIN = 'NETWORK_DOMAIN'
 ROOT_INTERNET = 'INTERNET'
-ROOT_RECYLCE_BIN = 'RECYLCE_BIN'
+RECYCLE_BIN = 'RECYCLE_BIN'
 ROOT_CONTROL_PANEL = 'CONTROL_PANEL'
 ROOT_USER = 'USERPROFILE'
 
-_ROOT_LOCATIONS = {'{20D04FE0-3AEA-1069-A2D8-08002B30309D}': ROOT_MY_COMPUTER,
-                  '{450D8FBA-AD25-11D0-98A8-0800361B1103}': ROOT_MY_DOCUMENTS,
-                  '{54a754c0-4bf1-11d1-83ee-00a0c90dc849}': ROOT_NETWORK_SHARE,
-                  '{c0542a90-4bf0-11d1-83ee-00a0c90dc849}': ROOT_NETWORK_SERVER,
-                  '{208D2C60-3AEA-1069-A2D7-08002B30309D}': ROOT_NETWORK_PLACES,
-                  '{46e06680-4bf0-11d1-83ee-00a0c90dc849}': ROOT_NETWORK_DOMAIN,
-                  '{871C5380-42A0-1069-A2EA-08002B30309D}': ROOT_INTERNET,
-                  '{645FF040-5081-101B-9F08-00AA002F954E}': ROOT_RECYLCE_BIN,
-                  '{21EC2020-3AEA-1069-A2DD-08002B30309D}': ROOT_CONTROL_PANEL,
-                  '{59031A47-3F72-44A7-89C5-5595FE6B30EE}': ROOT_USER,
-                   }
+_ROOT_LOCATIONS = {
+    '{20D04FE0-3AEA-1069-A2D8-08002B30309D}': ROOT_MY_COMPUTER,
+    '{450D8FBA-AD25-11D0-98A8-0800361B1103}': ROOT_MY_DOCUMENTS,
+    '{54a754c0-4bf1-11d1-83ee-00a0c90dc849}': ROOT_NETWORK_SHARE,
+    '{c0542a90-4bf0-11d1-83ee-00a0c90dc849}': ROOT_NETWORK_SERVER,
+    '{208D2C60-3AEA-1069-A2D7-08002B30309D}': ROOT_NETWORK_PLACES,
+    '{46e06680-4bf0-11d1-83ee-00a0c90dc849}': ROOT_NETWORK_DOMAIN,
+    '{871C5380-42A0-1069-A2EA-08002B30309D}': ROOT_INTERNET,
+    '{645FF040-5081-101B-9F08-00AA002F954E}': RECYCLE_BIN,
+    '{21EC2020-3AEA-1069-A2DD-08002B30309D}': ROOT_CONTROL_PANEL,
+    '{59031A47-3F72-44A7-89C5-5595FE6B30EE}': ROOT_USER,
+}
 _ROOT_LOCATION_GUIDS = dict((v, k) for k, v in _ROOT_LOCATIONS.items())
 
 TYPE_FOLDER = 'FOLDER'
@@ -137,21 +149,26 @@ _ENTRY_TYPES = {0x31: 'FOLDER', 0x32: 'FILE',
                0x35: 'FOLDER (UNICODE)', 0x36: 'FILE (UNICODE)'}
 _ENTRY_TYPE_IDS = dict((v, k) for k, v in _ENTRY_TYPES.items())
 
-_DRIVE_PATTERN = re.compile("(\w)[:/\\\\]*$")
+_DRIVE_PATTERN = re.compile(r"(\w)[:/\\\\]*$")
 
-#---- read and write binary data
+# ---- read and write binary data
+
 
 def read_byte(buf):
     return unpack('<B', buf.read(1))[0]
 
+
 def read_short(buf):
     return unpack('<H', buf.read(2))[0]
+
 
 def read_int(buf):
     return unpack('<I', buf.read(4))[0]
 
+
 def read_double(buf):
     return unpack('<Q', buf.read(8))[0]
+
 
 def read_cunicode(buf):
     s = b""
@@ -161,6 +178,7 @@ def read_cunicode(buf):
         b = buf.read(2)
     return s.decode('utf-16-le')
 
+
 def read_cstring(buf, padding=False):
     s = b""
     b = buf.read(1)
@@ -169,8 +187,9 @@ def read_cstring(buf, padding=False):
         b = buf.read(1)
     if padding and not len(s) % 2:
         buf.read(1) # make length + terminator even
-    #TODO: encoding is not clear, unicode-escape has been necessary sometimes
+    # TODO: encoding is not clear, unicode-escape has been necessary sometimes
     return s.decode(DEFAULT_CHARSET)
+
 
 def read_sized_string(buf, str=True):
     size = read_short(buf)
@@ -179,12 +198,14 @@ def read_sized_string(buf, str=True):
     else:
         return buf.read(size)
 
+
 def get_bits(value, start, count, length=16):
     mask = 0
     for i in range(count):
         mask = mask | 1 << i
     shift = length - start - count
     return value >> shift & mask
+
 
 def read_dos_datetime(buf):
     date = read_short(buf)
@@ -200,28 +221,35 @@ def read_dos_datetime(buf):
     day = max(day, 1)
     return datetime(year, month, day, hour, minute, second)
 
+
 def write_byte(val, buf):
     buf.write(pack('<B', val))
+
 
 def write_short(val, buf):
     buf.write(pack('<H', val))
 
+
 def write_int(val, buf):
     buf.write(pack('<I', val))
+
 
 def write_double(val, buf):
     buf.write(pack('<Q', val))
 
+
 def write_cstring(val, buf, padding=False):
-    #val = val.encode('unicode-escape').replace('\\\\', '\\')
+    # val = val.encode('unicode-escape').replace('\\\\', '\\')
     val = val.encode(DEFAULT_CHARSET)
     buf.write(val + b'\x00')
     if padding and not len(val) % 2:
         buf.write(b'\x00')
 
+
 def write_cunicode(val, buf):
     uni = val.encode('utf-16-le')
     buf.write(uni + b'\x00\x00')
+
 
 def write_sized_string(val, buf, str=True):
     size = len(val)
@@ -231,8 +259,10 @@ def write_sized_string(val, buf, str=True):
     else:
         buf.write(val.encode())
 
+
 def put_bits(bits, target, start, count, length=16):
     return target | bits << (length - start - count)
+
 
 def write_dos_datetime(val, buf):
     date = time = 0
@@ -245,7 +275,8 @@ def write_dos_datetime(val, buf):
     write_short(date, buf)
     write_short(time, buf)
 
-#---- helpers
+
+# ---- helpers
 
 def convert_time_to_unix(windows_time):
     # Windows time is specified as the number of 0.1 nanoseconds since January 1, 1601.
@@ -257,19 +288,24 @@ def convert_time_to_unix(windows_time):
     except OSError:
         return datetime.now()
 
+
 def convert_time_to_windows(unix_time):
     if isinstance(unix_time, datetime):
         unix_time = time.mktime(unix_time.timetuple())
     return int((unix_time + 11644473600) * 10000000)
 
+
 class FormatException(Exception):
     pass
+
 
 class MissingInformationException(Exception):
     pass
 
+
 class InvalidKeyException(Exception):
     pass
+
 
 def assert_lnk_signature(f):
     f.seek(0)
@@ -279,6 +315,7 @@ def assert_lnk_signature(f):
         raise FormatException("This is not a .lnk file.")
     if guid != _GUID:
         raise FormatException("Cannot read this kind of .lnk file.")
+
 
 def is_lnk(f):
     if hasattr(f, 'name'):
@@ -294,6 +331,7 @@ def is_lnk(f):
         except FormatException:
             return False
 
+
 def path_levels(p):
     dirname, base = os.path.split(p)
     if base != '':
@@ -301,13 +339,15 @@ def path_levels(p):
             yield level
     yield p
 
+
 def is_drive(data):
     if type(data) not in (str, str):
         return False
     p = re.compile("[a-zA-Z]:\\\\?$")
     return p.match(data) is not None
 
-#---- data structures
+
+# ---- data structures
 
 class Flags(object):
     
@@ -362,6 +402,7 @@ class ModifierKeys(Flags):
         s += self.ALT and "ALT+" or ""
         return s
 
+
 # _ROOT_INDEX = {
 #     0x00: 'INTERNET_EXPLORER1',
 #     0x42: 'LIBRARIES',
@@ -374,6 +415,7 @@ class ModifierKeys(Flags):
 #     0x70: 'UNKNOWN',
 #     0x80: 'MY_GAMES',
 # }
+
 
 class RootEntry(object):
     
@@ -400,7 +442,6 @@ class RootEntry(object):
             self.root = _ROOT_LOCATIONS.get(self.guid, "UNKNOWN")
             # if self.root == "UNKNOWN":
             #     self.root = _ROOT_INDEX.get(index, "UNKNOWN")
-
 
     def bytes(self):
         guid = self.guid[1:-1].replace('-', '')
@@ -778,16 +819,18 @@ class LinkInfo(object):
             s += "\n  Path: %s" % self.local_base_path
         return s
 
-EXTRA_DATA_TYPES = {0xA0000002: 'ConsoleDataBlock',             # size 0x000000CC
-                    0xA0000004: 'ConsoleFEDataBlock',           # size 0x0000000C
-                    0xA0000006: 'DarwinDataBlock',              # size 0x00000314
-                    0xA0000001: 'EnvironmentVariableDataBlock', # size 0x00000314
-                    0xA0000007: 'IconEnvironmentDataBlock',     # size 0x00000314
-                    0xA000000B: 'KnownFolderDataBlock',         # size 0x0000001C
-                    0xA0000009: 'PropertyStoreDataBlock',       # size >= 0x0000000C
-                    0xA0000008: 'ShimDataBlock',                # size >= 0x00000088
-                    0xA0000005: 'SpecialFolderDataBlock',       # size 0x00000010
-                    0xA0000003: 'VistaAndAboveIDListDataBlock', # size 0x00000060
+
+EXTRA_DATA_TYPES = {
+    0xA0000002: 'ConsoleDataBlock',  # size 0x000000CC
+    0xA0000004: 'ConsoleFEDataBlock',  # size 0x0000000C
+    0xA0000006: 'DarwinDataBlock',  # size 0x00000314
+    0xA0000001: 'EnvironmentVariableDataBlock',  # size 0x00000314
+    0xA0000007: 'IconEnvironmentDataBlock',  # size 0x00000314
+    0xA000000B: 'KnownFolderDataBlock',  # size 0x0000001C
+    0xA0000009: 'PropertyStoreDataBlock',  # size >= 0x0000000C
+    0xA0000008: 'ShimDataBlock',  # size >= 0x00000088
+    0xA0000005: 'SpecialFolderDataBlock',  # size 0x00000010
+    0xA0000003: 'VistaAndAboveIDListDataBlock',  # size 0x00000060
 }
 
 
@@ -821,9 +864,9 @@ class ExtraData_Unparsed(object):
         s = 'ExtraDataBlock\n signature %s\n data: %s' % (hex(self._signature), self.data)
         return s
 
+
 def padding(val, size, byte=b'\x00'):
     return val + (size-len(val)) * byte
-
 
 
 class ExtraData_IconEnvironmentDataBlock(object):
@@ -860,6 +903,7 @@ class ExtraData_IconEnvironmentDataBlock(object):
         s = 'IconEnvironmentDataBlock\n TargetAnsi: %s\n TargetUnicode: %s' % (self.TargetAnsi.replace('\x00',''), self.TargetUnicode.replace('\x00',''))
         return s
 
+
 def guid_to_str(guid):
     ordered = [guid[3], guid[2], guid[1], guid[0], guid[5], guid[4],
                guid[7], guid[6], guid[8], guid[9], guid[10], guid[11],
@@ -867,6 +911,7 @@ def guid_to_str(guid):
     res = "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}" % tuple([x for x in ordered])
     # print(guid, res)
     return res
+
 
 class TypedPropertyValue(object):
     # types: [MS-OLEPS] section 2.15
@@ -924,6 +969,7 @@ class TypedPropertyValue(object):
             num = (high << 32) + low
             value = convert_time_to_unix(num)
         return '%s: %s' % (hex(self.type), value)
+
 
 class PropertyStore:
     def __init__(self, bytes=None, properties=None, format_id=None, is_strings=False):
@@ -1009,7 +1055,6 @@ class PropertyStore:
         return s.strip()
 
 
-
 class ExtraData_PropertyStoreDataBlock(object):
     def __init__(self, bytes=None, stores=None):
         self._size = None
@@ -1054,9 +1099,10 @@ class ExtraData_PropertyStoreDataBlock(object):
         return s
 
 
-EXTRA_DATA_TYPES_CLASSES = {'IconEnvironmentDataBlock': ExtraData_IconEnvironmentDataBlock,
-                            'PropertyStoreDataBlock': ExtraData_PropertyStoreDataBlock}
-
+EXTRA_DATA_TYPES_CLASSES = {
+    'IconEnvironmentDataBlock': ExtraData_IconEnvironmentDataBlock,
+    'PropertyStoreDataBlock': ExtraData_PropertyStoreDataBlock,
+}
 
 
 class ExtraData(object):
@@ -1198,7 +1244,6 @@ class Lnk(object):
         # *EXTRA_DATA
         self.extra_data = ExtraData(lnk)
 
-    
     def save(self, f=None, force_ext=False):
         if f is None:
             f = self.file
@@ -1253,6 +1298,7 @@ class Lnk(object):
 
     def _get_shell_item_id_list(self):
         return self._shell_item_id_list
+
     def _set_shell_item_id_list(self, shell_item_id_list):
         self._shell_item_id_list = shell_item_id_list
         self.link_flags.HasLinkTargetIDList = shell_item_id_list is not None
@@ -1260,6 +1306,7 @@ class Lnk(object):
 
     def _get_link_info(self):
         return self._link_info
+
     def _set_link_info(self, link_info):
         self._link_info = link_info
         self.link_flags.ForceNoLinkInfo = link_info is None
@@ -1268,6 +1315,7 @@ class Lnk(object):
 
     def _get_description(self):
         return self._description
+
     def _set_description(self, description):
         self._description = description
         self.link_flags.HasName = description is not None
@@ -1275,6 +1323,7 @@ class Lnk(object):
 
     def _get_relative_path(self):
         return self._relative_path
+
     def _set_relative_path(self, relative_path):
         self._relative_path = relative_path
         self.link_flags.HasRelativePath = relative_path is not None
@@ -1282,6 +1331,7 @@ class Lnk(object):
 
     def _get_work_dir(self):
         return self._work_dir
+
     def _set_work_dir(self, work_dir):
         self._work_dir = work_dir
         self.link_flags.HasWorkingDir = work_dir is not None
@@ -1289,6 +1339,7 @@ class Lnk(object):
 
     def _get_arguments(self):
         return self._arguments
+
     def _set_arguments(self, arguments):
         self._arguments = arguments
         self.link_flags.HasArguments = arguments is not None
@@ -1296,6 +1347,7 @@ class Lnk(object):
 
     def _get_icon(self):
         return self._icon
+
     def _set_icon(self, icon):
         self._icon = icon
         self.link_flags.HasIconLocation = icon is not None
@@ -1303,6 +1355,7 @@ class Lnk(object):
     
     def _get_window_mode(self):
         return self._show_command
+
     def _set_window_mode(self, value):
         if not value in list(_SHOW_COMMANDS.values()):
             raise ValueError("Not a valid window mode: %s. Choose any of pylnk.WINDOW_*" % value)
@@ -1354,19 +1407,16 @@ class Lnk(object):
             s += str(self.extra_data)
         return s
 
-#---- convenience functions
 
+# ---- convenience functions
 
 def parse(lnk):
     return Lnk(lnk)
-
-
 
 def create(f=None):
     lnk = Lnk()
     lnk.file = f
     return lnk
-
 
 
 def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0, work_dir=None):
@@ -1398,7 +1448,6 @@ def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_
     if lnk_name:
         lnk.save()
     return lnk
-
 
 
 def from_segment_list(data, lnk_name=None):
@@ -1460,11 +1509,13 @@ def from_segment_list(data, lnk_name=None):
         lnk.save(lnk_name)
     return lnk
 
+
 def get_prop(obj, prop_queue):
     attr = getattr(obj, prop_queue[0])
     if len(prop_queue) > 1:
         return get_prop(attr, prop_queue[1:])
     return attr
+
 
 def usage_and_exit():
     usage = """usage: pylnk.py c[reate] TARGETFILE LNKFILE
