@@ -433,6 +433,7 @@ class RootEntry(object):
             # if self.root == "UNKNOWN":
             #     self.root = _ROOT_INDEX.get(index, "UNKNOWN")
 
+    @property
     def bytes(self):
         guid = self.guid[1:-1].replace('-', '')
         chars = [bytes([int(x, 16)]) for x in [guid[i:i+2] for i in range(0, 32, 2)]]
@@ -442,8 +443,7 @@ class RootEntry(object):
             + chars[5] + chars[4] + chars[7] + chars[6]
             + b''.join(chars[8:])
         )
-    bytes = property(bytes)
-    
+
     def __str__(self):
         return "<RootEntry: %s>" % self.root
 
@@ -462,7 +462,8 @@ class DriveEntry(object):
                 self.drive = self.drive.encode()
             else:
                 raise FormatException("This is not a valid drive: " + str(drive))
-    
+
+    @property
     def bytes(self):
         drive = self.drive
         padded_str = drive + b'\\' + b'\x00' * 19
@@ -471,8 +472,7 @@ class DriveEntry(object):
         # if isinstance(drive, str):
         #     drive = drive.encode()
         # return b'/' + drive + b'\\' + b'\x00' * 19
-    bytes = property(bytes)
-    
+
     def __str__(self):
         return "<DriveEntry: %s>" % self.drive
 
@@ -563,7 +563,8 @@ class PathSegmentEntry(object):
             raise MissingInformationException("A full name is missing")
         if self.short_name is None:
             self.short_name = self.full_name
-    
+
+    @property
     def bytes(self):
         if self.full_name is None:
             return
@@ -602,8 +603,7 @@ class PathSegmentEntry(object):
         offset_part2 = 0x0E + short_name_len
         write_short(offset_part2, out)
         return out.getvalue()
-    bytes = property(bytes)
-    
+
     def __str__(self):
         return "<PathSegmentEntry: %s>" % self.full_name
 
@@ -660,7 +660,8 @@ class LinkTargetIDList(object):
         if type(self.items[0]) == RootEntry:
             if self.items[0].root == ROOT_MY_COMPUTER and type(self.items[1]) != DriveEntry:
                 raise ValueError("A drive is required for absolute lnks")
-    
+
+    @property
     def bytes(self):
         self._validate()
         out = BytesIO()
@@ -673,8 +674,7 @@ class LinkTargetIDList(object):
             out.write(bytes)
         out.write(b'\x00\x00')
         return out.getvalue()
-    bytes = property(bytes)
-    
+
     def __str__(self):
         return "<LinkTargetIDList:\n%s>" % pformat([str(item) for item in self.items])
 
@@ -793,10 +793,10 @@ class LinkInfo(object):
         write_int(self.drive_serial, buf)
         write_int(16, buf)  # volume name offset
         write_cstring(self.volume_label, buf)
-    
-    def _get_path(self):
+
+    @property
+    def path(self):
         return self._path
-    path = property(_get_path)
 
     def __str__(self):
         s = "File Location Info:"
@@ -932,14 +932,13 @@ class TypedPropertyValue(object):
             buf.write(b'\x00\x00')
         self.value = buf.getvalue()
 
+    @property
     def bytes(self):
         buf = BytesIO()
         write_short(self.type, buf)
         write_short(0x0000, buf)
         buf.write(self.value)
         return buf.getvalue()
-
-    bytes = property(bytes)
 
     def __str__(self):
         value = self.value
@@ -1010,6 +1009,7 @@ class PropertyStore:
                 value = TypedPropertyValue(buf.read(value_size-9))
                 self.properties.append((value_id, value))
 
+    @property
     def bytes(self):
         size = 8 + len(self.format_id)
         properties = BytesIO()
@@ -1041,8 +1041,6 @@ class PropertyStore:
         buf.write(properties.getvalue())
 
         return buf.getvalue()
-
-    bytes = property(bytes)
 
     def __str__(self):
         s = ' PropertyStore'
@@ -1126,14 +1124,13 @@ class ExtraData(object):
                 block = block_class(bytes=bytes, signature=signature)
             self.blocks.append(block)
 
+    @property
     def bytes(self):
         result = b''
         for block in self.blocks:
             result += block.bytes()
         result += b'\x00\x00\x00\x00'  # TerminalBlock
         return result
-
-    bytes = property(bytes)
 
     def __str__(self):
         s = ''
@@ -1359,10 +1356,10 @@ class Lnk(object):
         self._show_command = value
     window_mode = show_command = property(_get_window_mode, _set_window_mode)
 
-    def _get_path(self):
+    @property
+    def path(self):
         return self._shell_item_id_list.get_path()
-    path = property(_get_path)
-    
+
     def specify_local_location(self, path, drive_type=None, drive_serial=None, volume_label=None):
         self._link_info.drive_type = drive_type or DRIVE_UNKNOWN
         self._link_info.drive_serial = drive_serial or ''
