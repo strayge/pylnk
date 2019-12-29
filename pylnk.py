@@ -1102,9 +1102,43 @@ class ExtraData_PropertyStoreDataBlock(object):
         return s
 
 
+class ExtraData_EnvironmentVariableDataBlock(object):
+    def __init__(self, bytes=None):
+        self._signature = 0xA0000001
+        self.target_ansi = None
+        self.target_unicode = None
+        if bytes:
+            self.read(bytes)
+
+    def read(self, bytes):
+        buf = BytesIO(bytes)
+        self.target_ansi = buf.read(260).decode()
+        self.target_unicode = buf.read(520).decode('utf-16-le')
+
+    def bytes(self):
+        target_ansi = padding(self.target_ansi.encode(), 260)
+        target_unicode = padding(self.target_unicode.encode('utf-16-le'), 520)
+        size = 8 + len(target_ansi) + len(target_unicode)
+        assert self._signature == 0xA0000001
+        assert size == 0x00000314
+        buf = BytesIO()
+        write_int(size, buf)
+        write_int(self._signature, buf)
+        buf.write(target_ansi)
+        buf.write(target_unicode)
+        return buf.getvalue()
+
+    def __str__(self):
+        target_ansi = self.target_ansi.replace('\x00', '')
+        target_unicode = self.target_unicode.replace('\x00', '')
+        s = f'EnvironmentVariableDataBlock\n TargetAnsi: {target_ansi}\n TargetUnicode: {target_unicode}'
+        return s
+
+
 EXTRA_DATA_TYPES_CLASSES = {
     'IconEnvironmentDataBlock': ExtraData_IconEnvironmentDataBlock,
     'PropertyStoreDataBlock': ExtraData_PropertyStoreDataBlock,
+    'EnvironmentVariableDataBlock': ExtraData_EnvironmentVariableDataBlock,
 }
 
 
@@ -1404,7 +1438,8 @@ class Lnk(object):
             s += "\nCommandline Arguments: %s" % self.arguments
         if self.link_flags.HasIconLocation:
             s += "\nIcon: %s" % self.icon
-        s += "\nUsed Path: %s" % self.shell_item_id_list.get_path()
+        if self.link_flags.HasLinkInfo:
+            s += "\nUsed Path: %s" % self.shell_item_id_list.get_path()
         if self.extra_data:
             s += str(self.extra_data)
         return s
