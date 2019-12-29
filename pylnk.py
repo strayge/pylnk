@@ -1,25 +1,8 @@
-#!/usr/bin/python
-#
-# Python library for reading and writing Windows shortcut files (.lnk)
-# Copyright 2011 Tim-Christian Mundt
-#
-# This library is free software; you can redistribute it and/or
-# modify it under the terms of the GNU Lesser General Public
-# License as published by the Free Software Foundation; either
-# version 3 of the License, or (at your option) any later version.
-#
-# This library is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with this library; if not, see
-# <http://www.gnu.org/licenses/>.
+#!/usr/bin/env python3
 
-# original:
+# original version written by Tim-Christian Mundt (2011):
 # https://sourceforge.net/p/pylnk/code/HEAD/tree/trunk/pylnk.py
-#
+
 # converted to python3 by strayge:
 # https://github.com/strayge/pylnk
 
@@ -186,7 +169,7 @@ def read_cstring(buf, padding=False):
         s += b
         b = buf.read(1)
     if padding and not len(s) % 2:
-        buf.read(1) # make length + terminator even
+        buf.read(1)  # make length + terminator even
     # TODO: encoding is not clear, unicode-escape has been necessary sometimes
     return s.decode(DEFAULT_CHARSET)
 
@@ -499,7 +482,7 @@ class PathSegmentEntry(object):
             short_name_is_unicode = self.type.endswith('(UNICODE)')
             self.file_size = read_int(buf)
             self.modified = read_dos_datetime(buf)
-            unknown = read_short(buf) # FileAttributesL
+            unknown = read_short(buf)  # FileAttributesL
             if short_name_is_unicode:
                 self.short_name = read_cunicode(buf)
             else:
@@ -508,13 +491,13 @@ class PathSegmentEntry(object):
             extra_version = read_short(buf)
             extra_signature = read_int(buf)
             if extra_signature == 0xBEEF0004:
-                # indicator_1 = read_short(buf) # see below
+                # indicator_1 = read_short(buf)  # see below
                 # only_83 = read_short(buf) < 0x03
-                # unknown = read_short(buf) # 0x04
+                # unknown = read_short(buf)  # 0x04
                 # self.is_unicode = read_short(buf) == 0xBeef
-                self.created = read_dos_datetime(buf) # 4 bytes
-                self.accessed = read_dos_datetime(buf) # 4 bytes
-                offset_unicode = read_short(buf)  # offset from start of extra_size
+                self.created = read_dos_datetime(buf)  # 4 bytes
+                self.accessed = read_dos_datetime(buf)  # 4 bytes
+                offset_unicode = read_short(buf)   # offset from start of extra_size
                 # only_83_2 = offset_unicode >= indicator_1 or offset_unicode < 0x14
                 if extra_version >= 7:
                     offset_ansi = read_short(buf)
@@ -580,7 +563,7 @@ class PathSegmentEntry(object):
         try:
             self.short_name.encode("ascii")
             short_name_is_unicode = False
-            short_name_len += short_name_len % 2 # padding
+            short_name_len += short_name_len % 2  # padding
         except (UnicodeEncodeError, UnicodeDecodeError):
             short_name_is_unicode = True
             short_name_len = short_name_len * 2
@@ -595,14 +578,14 @@ class PathSegmentEntry(object):
             write_cstring(self.short_name, out, padding=True)
         indicator = 24 + 2 * len(self.short_name)
         write_short(indicator, out)  # size
-        write_short(0x03, out)   # version
-        write_short(0x04, out)   # signature part1
-        write_short(0xBeef, out) # signature part2
+        write_short(0x03, out)  # version
+        write_short(0x04, out)  # signature part1
+        write_short(0xBeef, out)  # signature part2
         write_dos_datetime(self.created, out)
         write_dos_datetime(self.accessed, out)
-        offset_unicode = 0x14 # fixed data structure, always the same
+        offset_unicode = 0x14  # fixed data structure, always the same
         write_short(offset_unicode, out)
-        offset_ansi = 0 # we always write unicode
+        offset_ansi = 0  # we always write unicode
         write_short(offset_ansi, out)  # long_string_size
         write_cunicode(self.full_name, out)
         offset_part2 = 0x0E + short_name_len
@@ -623,7 +606,7 @@ class LinkTargetIDList(object):
             raw = []
             entry_len = read_short(buf)
             while entry_len > 0:
-                raw.append(buf.read(entry_len - 2)) # the length includes the size
+                raw.append(buf.read(entry_len - 2))  # the length includes the size
                 entry_len = read_short(buf)
             self._interpret(raw)
     
@@ -674,7 +657,7 @@ class LinkTargetIDList(object):
             # skip invalid
             if bytes is None:
                 continue
-            write_short(len(bytes) + 2, out) # len + terminator
+            write_short(len(bytes) + 2, out)  # len + terminator
             out.write(bytes)
         out.write(b'\x00\x00')
         return out.getvalue()
@@ -699,7 +682,7 @@ class LinkInfo(object):
             self.offs_network_volume_table = read_int(lnk)
             self.offs_base_name = read_int(lnk)
             if self.header_size >= _LINK_INFO_HEADER_OPTIONAL:
-                print("TODO: read the unicode stuff") # TODO: read the unicode stuff
+                print("TODO: read the unicode stuff")  # TODO: read the unicode stuff
             self._parse_path_elements(lnk)
         else:
             self.size = None
@@ -728,7 +711,7 @@ class LinkInfo(object):
             lnk.seek(self.start + self.offs_local_volume_table + 4)
             self.drive_type = _DRIVE_TYPES.get(read_int(lnk))
             self.drive_serial = read_int(lnk)
-            lnk.read(4) # volume name offset (10h)
+            lnk.read(4)  # volume name offset (10h)
             self.volume_label = read_cstring(lnk)
             lnk.seek(self.start + self.offs_local_base_path)
             self.local_base_path = read_cstring(lnk)
@@ -762,7 +745,7 @@ class LinkInfo(object):
         write_byte(0,lnk)
     
     def _calculate_sizes_and_offsets(self):
-        self.size_base_name = 1 # len(self.base_name) + 1 # zero terminated strings
+        self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
         self.size = 28 + self.size_base_name
         if self.remote:
             self.size_network_volume_table = 20 + len(self.network_share_name) + 1
@@ -782,10 +765,10 @@ class LinkInfo(object):
     
     def _write_network_volume_table(self, buf):
         write_int(self.size_network_volume_table, buf)
-        write_int(2, buf) # ?
-        write_int(20, buf) # size of Network Volume Table
-        write_int(0, buf) # ?
-        write_int(131072, buf) # ?
+        write_int(2, buf)  # ?
+        write_int(20, buf)  # size of Network Volume Table
+        write_int(0, buf)  # ?
+        write_int(131072, buf)  # ?
         write_cstring(self.network_share_name, buf)
     
     def _write_local_volume_table(self, buf):
@@ -796,7 +779,7 @@ class LinkInfo(object):
             raise ValueError("This is not a valid drive type: %s" % self.drive_type)
         write_int(drive_type, buf)
         write_int(self.drive_serial, buf)
-        write_int(16, buf) # volume name offset
+        write_int(16, buf)  # volume name offset
         write_cstring(self.volume_label, buf)
     
     def _get_path(self):
@@ -1115,7 +1098,7 @@ class ExtraData(object):
             return
         while True:
             size = read_int(lnk)
-            if size < 4: # TerminalBlock
+            if size < 4:  # TerminalBlock
                 break
             signature = read_int(lnk)
             bytes = lnk.read(size-8)
@@ -1133,7 +1116,7 @@ class ExtraData(object):
         result = b''
         for block in self.blocks:
             result += block.bytes()
-        result += b'\x00\x00\x00\x00' # TerminalBlock
+        result += b'\x00\x00\x00\x00'  # TerminalBlock
         return result
 
     bytes = property(bytes)
@@ -1206,7 +1189,7 @@ class Lnk(object):
         # SHELL_LINK_HEADER [LINKTARGET_IDLIST] [LINKINFO] [STRING_DATA] *EXTRA_DATA
 
         # SHELL_LINK_HEADER
-        lnk.seek(20) # after signature and guid
+        lnk.seek(20)  # after signature and guid
         self.link_flags.set_flags(read_int(lnk))
         self.file_flags.set_flags(read_int(lnk))
         self.creation_time = convert_time_to_unix(read_double(lnk))
@@ -1217,7 +1200,7 @@ class Lnk(object):
         show_command = read_int(lnk)
         self._show_command = _SHOW_COMMANDS[show_command] if show_command in _SHOW_COMMANDS else _SHOW_COMMANDS[1]
         self.hot_key = self._read_hot_key(lnk)
-        lnk.read(10) # reserved (0)
+        lnk.read(10)  # reserved (0)
 
         # LINKTARGET_IDLIST (HasLinkTargetIDList)
         if self.link_flags.HasLinkTargetIDList:
@@ -1274,7 +1257,7 @@ class Lnk(object):
         write_int(self.icon_index, lnk)
         write_int(_SHOW_COMMAND_IDS[self._show_command], lnk)
         self._write_hot_key(self.hot_key, lnk)
-        lnk.write(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00') # reserved
+        lnk.write(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')  # reserved
         if self.link_flags.HasLinkTargetIDList:
             siil = self.shell_item_id_list.bytes
             write_short(len(siil), lnk)
@@ -1412,6 +1395,7 @@ class Lnk(object):
 
 def parse(lnk):
     return Lnk(lnk)
+
 
 def create(f=None):
     lnk = Lnk()
