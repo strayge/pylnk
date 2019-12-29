@@ -616,6 +616,108 @@ class PathSegmentEntry(object):
         return "<PathSegmentEntry: %s>" % self.full_name
 
 
+class UwpSubBlock:
+
+    block_names = {
+        0x11: 'PackageFamilyName',
+        # 0x0e: '',
+        # 0x19: '',
+        0x15: 'PackageFullName',
+        0x05: 'Target',
+        0x0f: 'Location',
+        0x20: 'RandomGuid',
+        0x0c: 'Square150x150Logo',
+        0x02: 'Square44x44Logo',
+        0x0d: 'Wide310x150Logo',
+        # 0x04: '',
+        # 0x05: '',
+        0x13: 'Square310x310Logo',
+        # 0x0e: '',
+        0x0b: 'DisplayName',
+        0x14: 'Square71x71Logo',
+        0x64: 'RandomByte',
+        0x0a: 'DisplayName',
+        # 0x07: '',
+    }
+
+    block_types = {
+        'string': [0x11, 0x15, 0x05, 0x0f, 0x0c, 0x02, 0x0d, 0x13, 0x0b, 0x14, 0x0a],
+    }
+
+    def __init__(self, bytes=None):
+        self._data = bytes or b''
+        self.type = None
+        self.name = None
+        self.value = None
+        if not bytes:
+            return
+        buf = BytesIO(bytes)
+        self.type = read_byte(buf)
+        self.name = self.block_names.get(self.type, 'UNKNOWN')
+
+        self.value = self._data
+        if self.type in self.block_types['string']:
+            unknown = read_int(buf)
+            probably_type = read_int(buf)
+            if probably_type == 0x1f:
+                string_len = read_int(buf)
+                self.value = read_cunicode(buf)
+
+    def __str__(self):
+        string = f'UwpSubBlock {self.name}: {self.value}'
+        return string.strip()
+
+
+class UwpMainBlock:
+    def __init__(self, bytes=None):
+        self._data = bytes or b''
+        self._blocks = []
+        if not bytes:
+            return
+        buf = BytesIO(bytes)
+        magic = buf.read(4)
+        guid = buf.read(16)
+        # read sub blocks
+        while True:
+            sub_block_size = read_int(buf)
+            if not sub_block_size:  # last size is zero
+                break
+            sub_block_data = buf.read(sub_block_size - 4)  # includes block_size
+            self._blocks.append(UwpSubBlock(sub_block_data))
+
+    def __str__(self):
+        string = '<UwpMainBlock>:\n'
+        for block in self._blocks:
+            string += f'      {block}\n'
+        return string.strip()
+
+
+class UwpSegmentEntry:
+    def __init__(self, bytes=None):
+        self._blocks = []
+        if bytes is None:
+            return
+        buf = BytesIO(bytes)
+        unknown = read_short(buf)
+        size = read_short(buf)
+        uwp_magic = buf.read(4)  # b'APPS'
+        blocks_size = read_short(buf)
+        unknown2 = buf.read(10)
+        # read main blocks
+        while True:
+            block_size = read_int(buf)
+            if not block_size:  # last size is zero
+                break
+            block_data = buf.read(block_size - 4)  # includes block_size
+            self._blocks.append(UwpMainBlock(block_data))
+
+    def __str__(self):
+        string = '<UwpSegmentEntry>:\n'
+        for block in self._blocks:
+            string += f'    {block}\n'
+        return string.strip()
+
+
 class LinkTargetIDList(object):
     
     def __init__(self, bytes=None):
@@ -648,7 +750,10 @@ class LinkTargetIDList(object):
         else:
             items = raw
         for item in items:
-            self.items.append(PathSegmentEntry(item))
+            if item[4:8] == b'APPS':
+                self.items.append(UwpSegmentEntry(item))
+            else:
+                self.items.append(PathSegmentEntry(item))
     
     def get_path(self):
         segments = []
@@ -684,7 +789,10 @@ class LinkTargetIDList(object):
         return out.getvalue()
 
     def __str__(self):
-        return "<LinkTargetIDList:\n%s>" % pformat([str(item) for item in self.items])
+        string = '<LinkTargetIDList>:\n'
+        for item in self.items:
+            string += f'  {item}\n'
+        return string.strip()
 
 
 class LinkInfo(object):
