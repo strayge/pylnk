@@ -11,9 +11,10 @@ import re
 import sys
 import time
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, IOBase
 from pprint import pformat
 from struct import pack, unpack
+from typing import Optional, Union
 
 DEFAULT_CHARSET = 'cp1251'
 
@@ -68,7 +69,7 @@ _MODIFIER_KEYS = ('SHIFT', 'CONTROL', 'ALT')
 WINDOW_NORMAL = "Normal"
 WINDOW_MAXIMIZED = "Maximized"
 WINDOW_MINIMIZED = "Minimized"
-_SHOW_COMMANDS = {1:WINDOW_NORMAL, 3:WINDOW_MAXIMIZED, 7:WINDOW_MINIMIZED}
+_SHOW_COMMANDS = {1: WINDOW_NORMAL, 3: WINDOW_MAXIMIZED, 7: WINDOW_MINIMIZED}
 _SHOW_COMMAND_IDS = dict((v, k) for k, v in _SHOW_COMMANDS.items())
 
 DRIVE_UNKNOWN = "Unknown"
@@ -128,11 +129,13 @@ _ROOT_LOCATION_GUIDS = dict((v, k) for k, v in _ROOT_LOCATIONS.items())
 
 TYPE_FOLDER = 'FOLDER'
 TYPE_FILE = 'FILE'
-_ENTRY_TYPES = {0x31: 'FOLDER', 0x32: 'FILE',
-               0x35: 'FOLDER (UNICODE)', 0x36: 'FILE (UNICODE)'}
+_ENTRY_TYPES = {
+    0x31: 'FOLDER', 0x32: 'FILE',
+    0x35: 'FOLDER (UNICODE)', 0x36: 'FILE (UNICODE)',
+}
 _ENTRY_TYPE_IDS = dict((v, k) for k, v in _ENTRY_TYPES.items())
 
-_DRIVE_PATTERN = re.compile(r"(\w)[:/\\\\]*$")
+_DRIVE_PATTERN = re.compile(r'(\w)[:/\\]*$')
 
 # ---- read and write binary data
 
@@ -156,7 +159,7 @@ def read_double(buf):
 def read_cunicode(buf):
     s = b""
     b = buf.read(2)
-    while b!= b'\x00\x00':
+    while b != b'\x00\x00':
         s += b
         b = buf.read(2)
     return s.decode('utf-16-le')
@@ -174,9 +177,9 @@ def read_cstring(buf, padding=False):
     return s.decode(DEFAULT_CHARSET)
 
 
-def read_sized_string(buf, str=True):
+def read_sized_string(buf, string=True):
     size = read_short(buf)
-    if str:
+    if string:
         return buf.read(size*2).decode('utf-16-le')
     else:
         return buf.read(size)
@@ -234,10 +237,10 @@ def write_cunicode(val, buf):
     buf.write(uni + b'\x00\x00')
 
 
-def write_sized_string(val, buf, str=True):
+def write_sized_string(val, buf, string=True):
     size = len(val)
     write_short(size, buf)
-    if str:
+    if string:
         buf.write(val.encode('utf-16-le'))
     else:
         buf.write(val.encode())
@@ -404,7 +407,7 @@ class RootEntry(object):
     
     def __init__(self, root):
         if root is not None:
-            # create from text represetation
+            # create from text representation
             if root in list(_ROOT_LOCATION_GUIDS.keys()):
                 self.root = root
                 self.guid = _ROOT_LOCATION_GUIDS[root]
@@ -429,8 +432,12 @@ class RootEntry(object):
     def bytes(self):
         guid = self.guid[1:-1].replace('-', '')
         chars = [bytes([int(x, 16)]) for x in [guid[i:i+2] for i in range(0, 32, 2)]]
-        return b'\x1F\x50' + chars[3] + chars[2] + chars[1] + chars[0] + chars[5] + chars[4] \
-                + chars[7] + chars[6] + b''.join(chars[8:])
+        return (
+            b'\x1F\x50'
+            + chars[3] + chars[2] + chars[1] + chars[0]
+            + chars[5] + chars[4] + chars[7] + chars[6]
+            + b''.join(chars[8:])
+        )
     bytes = property(bytes)
     
     def __str__(self):
@@ -620,8 +627,10 @@ class LinkTargetIDList(object):
                 self.items.append(DriveEntry(raw[1]))
                 items = raw[2:]
             elif self.items[0].root == ROOT_NETWORK_PLACES:
-                raise NotImplementedError("""Parsing network lnks has not yet been implemented.
-                     If you need it just contact me and we'll see...""")
+                raise NotImplementedError(
+                    "Parsing network lnks has not yet been implemented. "
+                    "If you need it just contact me and we'll see..."
+                )
             else:
                 items = raw[1:]
         else:
@@ -645,8 +654,7 @@ class LinkTargetIDList(object):
     
     def _validate(self):
         if type(self.items[0]) == RootEntry:
-            if self.items[0].root == ROOT_MY_COMPUTER \
-            and type(self.items[1]) != DriveEntry:
+            if self.items[0].root == ROOT_MY_COMPUTER and type(self.items[1]) != DriveEntry:
                 raise ValueError("A drive is required for absolute lnks")
     
     def bytes(self):
@@ -742,7 +750,7 @@ class LinkInfo(object):
         else:
             self._write_local_volume_table(lnk)
             write_cstring(self.local_base_path, lnk, padding=True)
-        write_byte(0,lnk)
+        write_byte(0, lnk)
     
     def _calculate_sizes_and_offsets(self):
         self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
@@ -823,7 +831,7 @@ class ExtraData_Unparsed(object):
         self._size = None
         self.data = data
         # if data:
-            # self._size = len(data)
+        #     self._size = len(data)
         if bytes:
             # self._size = len(bytes)
             self.data = bytes
@@ -857,8 +865,8 @@ class ExtraData_IconEnvironmentDataBlock(object):
         # self._size = None
         # self._signature = None
         self._signature = 0xA0000007
-        self.TargetAnsi = None
-        self.TargetUnicode = None
+        self.target_ansi = None
+        self.target_unicode = None
         if bytes:
             self.read(bytes)
 
@@ -866,24 +874,26 @@ class ExtraData_IconEnvironmentDataBlock(object):
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
-        self.TargetAnsi = buf.read(260).decode()
-        self.TargetUnicode = buf.read(520).decode('utf-16-le')
+        self.target_ansi = buf.read(260).decode()
+        self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
-        TargetAnsi = padding(self.TargetAnsi.encode(), 260)
-        TargetUnicode = padding(self.TargetUnicode.encode('utf-16-le'), 520)
-        size = 8 + len(TargetAnsi) + len(TargetUnicode)
+        target_ansi = padding(self.target_ansi.encode(), 260)
+        target_unicode = padding(self.target_unicode.encode('utf-16-le'), 520)
+        size = 8 + len(target_ansi) + len(target_unicode)
         assert self._signature == 0xA0000007
         assert size == 0x00000314
         buf = BytesIO()
         write_int(size, buf)
         write_int(self._signature, buf)
-        buf.write(TargetAnsi)
-        buf.write(TargetUnicode)
+        buf.write(target_ansi)
+        buf.write(target_unicode)
         return buf.getvalue()
 
     def __str__(self):
-        s = 'IconEnvironmentDataBlock\n TargetAnsi: %s\n TargetUnicode: %s' % (self.TargetAnsi.replace('\x00',''), self.TargetUnicode.replace('\x00',''))
+        target_ansi = self.target_ansi.replace('\x00', '')
+        target_unicode = self.target_unicode.replace('\x00', '')
+        s = f'IconEnvironmentDataBlock\n TargetAnsi: {target_ansi}\n TargetUnicode: {target_unicode}'
         return s
 
 
@@ -1227,11 +1237,11 @@ class Lnk(object):
         # *EXTRA_DATA
         self.extra_data = ExtraData(lnk)
 
-    def save(self, f=None, force_ext=False):
+    def save(self, f: Optional[Union[str, IOBase]] = None, force_ext=False):
         if f is None:
             f = self.file
         if f is None:
-            raise ValueError("File (name) missing for saveing the lnk")
+            raise ValueError("File (name) missing for saving the lnk")
         is_file = hasattr(f, 'write')
         if not is_file:
             if not type(f) == str and not type(f) == str:
@@ -1259,9 +1269,9 @@ class Lnk(object):
         self._write_hot_key(self.hot_key, lnk)
         lnk.write(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')  # reserved
         if self.link_flags.HasLinkTargetIDList:
-            siil = self.shell_item_id_list.bytes
-            write_short(len(siil), lnk)
-            lnk.write(siil)
+            shell_item_id_list = self.shell_item_id_list.bytes
+            write_short(len(shell_item_id_list), lnk)
+            lnk.write(shell_item_id_list)
         if self.link_flags.HasLinkInfo:
             self._link_info.write(lnk)
         if self.link_flags.HasName:
@@ -1340,7 +1350,7 @@ class Lnk(object):
         return self._show_command
 
     def _set_window_mode(self, value):
-        if not value in list(_SHOW_COMMANDS.values()):
+        if value not in list(_SHOW_COMMANDS.values()):
             raise ValueError("Not a valid window mode: %s. Choose any of pylnk.WINDOW_*" % value)
         self._show_command = value
     window_mode = show_command = property(_get_window_mode, _set_window_mode)
@@ -1521,7 +1531,7 @@ if __name__ == "__main__":
     if sys.argv[1] in ['h', '-h', '--help']:
         usage_and_exit()
     action = sys.argv[1]
-    if not action in ['c', 'create', 'p', 'parse', 'd']:
+    if action not in ['c', 'create', 'p', 'parse', 'd']:
         print("unknown action: " + action)
         usage_and_exit()
     if action.startswith('c'):
