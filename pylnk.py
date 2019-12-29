@@ -493,48 +493,50 @@ class PathSegmentEntry(object):
         self.created = None
         self.accessed = None
         self.full_name = None
-        if bytes is not None:
-            buf = BytesIO(bytes)
-            self.type = _ENTRY_TYPES.get(read_short(buf), 'UNKNOWN')
-            short_name_is_unicode = self.type.endswith('(UNICODE)')
-            self.file_size = read_int(buf)
-            self.modified = read_dos_datetime(buf)
-            unknown = read_short(buf)  # FileAttributesL
-            if short_name_is_unicode:
-                self.short_name = read_cunicode(buf)
-            else:
-                self.short_name = read_cstring(buf, padding=True)
-            extra_size = read_short(buf)
-            extra_version = read_short(buf)
-            extra_signature = read_int(buf)
-            if extra_signature == 0xBEEF0004:
-                # indicator_1 = read_short(buf)  # see below
-                # only_83 = read_short(buf) < 0x03
-                # unknown = read_short(buf)  # 0x04
-                # self.is_unicode = read_short(buf) == 0xBeef
-                self.created = read_dos_datetime(buf)  # 4 bytes
-                self.accessed = read_dos_datetime(buf)  # 4 bytes
-                offset_unicode = read_short(buf)   # offset from start of extra_size
-                # only_83_2 = offset_unicode >= indicator_1 or offset_unicode < 0x14
-                if extra_version >= 7:
-                    offset_ansi = read_short(buf)
-                    file_reference = read_double(buf)
-                    unknown2 = read_double(buf)
-                long_string_size = 0
-                if extra_version >= 3:
-                    long_string_size = read_short(buf)
-                if extra_version >= 9:
-                    unknown4 = read_int(buf)
-                if extra_version >= 8:
-                    unknown5 = read_int(buf)
-                if extra_version >= 3:
-                    self.full_name = read_cunicode(buf)
-                    if long_string_size > 0:
-                        if extra_version >= 7:
-                            self.localized_name = read_cunicode(buf)
-                        else:
-                            self.localized_name = read_cstring(buf)
-                    version_offset = read_short(buf)
+        if bytes is None:
+            return
+
+        buf = BytesIO(bytes)
+        self.type = _ENTRY_TYPES.get(read_short(buf), 'UNKNOWN')
+        short_name_is_unicode = self.type.endswith('(UNICODE)')
+        self.file_size = read_int(buf)
+        self.modified = read_dos_datetime(buf)
+        unknown = read_short(buf)  # FileAttributesL
+        if short_name_is_unicode:
+            self.short_name = read_cunicode(buf)
+        else:
+            self.short_name = read_cstring(buf, padding=True)
+        extra_size = read_short(buf)
+        extra_version = read_short(buf)
+        extra_signature = read_int(buf)
+        if extra_signature == 0xBEEF0004:
+            # indicator_1 = read_short(buf)  # see below
+            # only_83 = read_short(buf) < 0x03
+            # unknown = read_short(buf)  # 0x04
+            # self.is_unicode = read_short(buf) == 0xBeef
+            self.created = read_dos_datetime(buf)  # 4 bytes
+            self.accessed = read_dos_datetime(buf)  # 4 bytes
+            offset_unicode = read_short(buf)   # offset from start of extra_size
+            # only_83_2 = offset_unicode >= indicator_1 or offset_unicode < 0x14
+            if extra_version >= 7:
+                offset_ansi = read_short(buf)
+                file_reference = read_double(buf)
+                unknown2 = read_double(buf)
+            long_string_size = 0
+            if extra_version >= 3:
+                long_string_size = read_short(buf)
+            if extra_version >= 9:
+                unknown4 = read_int(buf)
+            if extra_version >= 8:
+                unknown5 = read_int(buf)
+            if extra_version >= 3:
+                self.full_name = read_cunicode(buf)
+                if long_string_size > 0:
+                    if extra_version >= 7:
+                        self.localized_name = read_cunicode(buf)
+                    else:
+                        self.localized_name = read_cstring(buf)
+                version_offset = read_short(buf)
     
     def create_for_path(cls, path):
         entry = cls()
