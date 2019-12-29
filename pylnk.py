@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO, IOBase
 from pprint import pformat
 from struct import pack, unpack
-from typing import Optional, Union
+from typing import Optional, Union, Tuple, Dict
 
 DEFAULT_CHARSET = 'cp1251'
 
@@ -337,24 +337,26 @@ def is_drive(data):
 
 class Flags(object):
     
-    def __init__(self, flag_names, flags_bytes=0):
+    def __init__(self, flag_names: Tuple[str, ...], flags_bytes=0):
         self._flag_names = flag_names
-        self._flags = dict([(name, None) for name in flag_names])
+        self._flags: Dict[str, bool] = dict([(name, False) for name in flag_names])
         self.set_flags(flags_bytes)
     
     def set_flags(self, flags_bytes):
-        for pos in range(len(self._flag_names)):
-            self._flags[self._flag_names[pos]] = flags_bytes >> pos & 0x1 and True or False
-    
+        for pos, flag_name in enumerate(self._flag_names):
+            self._flags[flag_name] = bool(flags_bytes >> pos & 0x1)
+
+    @property
     def bytes(self):
         bytes = 0
         for pos in range(len(self._flag_names)):
             bytes = (self._flags[self._flag_names[pos]] and 1 or 0) << pos | bytes
         return bytes
-    bytes = property(bytes)
     
     def __getitem__(self, key):
-        return object.__getattribute__(self, '_flags')[key]
+        if key in self._flags:
+            return object.__getattribute__(self, '_flags')[key]
+        return object.__getattribute__(self, key)
     
     def __setitem__(self, key, value):
         if key not in self._flags:
@@ -362,7 +364,9 @@ class Flags(object):
         self._flags[key] = value
     
     def __getattr__(self, key):
-        return object.__getattribute__(self, '_flags')[key]
+        if key in self._flags:
+            return object.__getattribute__(self, '_flags')[key]
+        return object.__getattribute__(self, key)
     
     def __setattr__(self, key, value):
         if '_flags' not in self.__dict__:
