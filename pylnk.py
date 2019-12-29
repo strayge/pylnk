@@ -130,8 +130,14 @@ _ROOT_LOCATION_GUIDS = dict((v, k) for k, v in _ROOT_LOCATIONS.items())
 TYPE_FOLDER = 'FOLDER'
 TYPE_FILE = 'FILE'
 _ENTRY_TYPES = {
-    0x31: 'FOLDER', 0x32: 'FILE',
-    0x35: 'FOLDER (UNICODE)', 0x36: 'FILE (UNICODE)',
+    0x31: 'FOLDER',
+    0x32: 'FILE',
+    0x35: 'FOLDER (UNICODE)',
+    0x36: 'FILE (UNICODE)',
+    # founded in doc, not tested
+    0x1f: 'ROOT_FOLDER',
+    0x61: 'URI',
+    0x71: 'CONTROL_PANEL',
 }
 _ENTRY_TYPE_IDS = dict((v, k) for k, v in _ENTRY_TYPES.items())
 
