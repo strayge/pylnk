@@ -667,8 +667,32 @@ class UwpSubBlock:
         string = f'UwpSubBlock {self.name}: {self.value}'
         return string.strip()
 
+    @property
+    def bytes(self):
+        out = BytesIO()
+        if self.value:
+            if isinstance(self.value, str):
+                string_len = len(self.value) + 1
+
+                write_byte(self.type, out)
+                write_int(0, out)
+                write_int(0x1f, out)
+
+                write_int(string_len, out)
+                write_cunicode(self.value, out)
+                if string_len % 2 == 1:  # padding
+                    write_short(0, out)
+
+            elif isinstance(self.value, bytes):
+                out.write(self.value)
+
+        result = out.getvalue()
+        return result
+
 
 class UwpMainBlock:
+    magic = b'\x31\x53\x50\x53'
+
     def __init__(self, bytes=None):
         self._data = bytes or b''
         self._blocks = []
@@ -676,7 +700,7 @@ class UwpMainBlock:
             return
         buf = BytesIO(bytes)
         magic = buf.read(4)
-        guid = buf.read(16)
+        self.guid = buf.read(16)
         # read sub blocks
         while True:
             sub_block_size = read_int(buf)
@@ -691,16 +715,33 @@ class UwpMainBlock:
             string += f'      {block}\n'
         return string.strip()
 
+    @property
+    def bytes(self):
+        blocks_bytes = [block.bytes for block in self._blocks]
+        out = BytesIO()
+        out.write(self.magic)
+        out.write(self.guid)
+        for block in blocks_bytes:
+            write_int(len(block) + 4, out)
+            out.write(block)
+        write_int(0, out)
+        result = out.getvalue()
+        return result
+
 
 class UwpSegmentEntry:
+    magic = b'APPS'
+    header = b'\x08\x00\x03\x00\x00\x00\x00\x00\x00\x00'
+
     def __init__(self, bytes=None):
         self._blocks = []
+        self._data = bytes
         if bytes is None:
             return
         buf = BytesIO(bytes)
         unknown = read_short(buf)
         size = read_short(buf)
-        uwp_magic = buf.read(4)  # b'APPS'
+        magic = buf.read(4)  # b'APPS'
         blocks_size = read_short(buf)
         unknown2 = buf.read(10)
         # read main blocks
@@ -716,6 +757,33 @@ class UwpSegmentEntry:
         for block in self._blocks:
             string += f'    {block}\n'
         return string.strip()
+
+    @property
+    def bytes(self):
+        blocks_bytes = [block.bytes for block in self._blocks]
+        blocks_size = sum([len(block) + 4 for block in blocks_bytes]) + 4   # with terminator
+        size = (
+            2  # size
+            + len(self.magic)
+            + 2  # second size
+            + len(self.header)
+            + blocks_size  # blocks with terminator
+        )
+
+        out = BytesIO()
+        write_short(0, out)
+        write_short(size, out)
+        out.write(self.magic)
+        write_short(blocks_size, out)
+        out.write(self.header)
+        for block in blocks_bytes:
+            write_int(len(block) + 4, out)
+            out.write(block)
+        write_int(0, out)  # empty block
+        write_short(0, out)  # ??
+
+        result = out.getvalue()
+        return result
 
 
 class LinkTargetIDList(object):
