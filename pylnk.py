@@ -112,6 +112,7 @@ ROOT_INTERNET = 'INTERNET'
 RECYCLE_BIN = 'RECYCLE_BIN'
 ROOT_CONTROL_PANEL = 'CONTROL_PANEL'
 ROOT_USER = 'USERPROFILE'
+ROOT_UWP_APPS = 'APPS'
 
 _ROOT_LOCATIONS = {
     '{20D04FE0-3AEA-1069-A2D8-08002B30309D}': ROOT_MY_COMPUTER,
@@ -124,6 +125,7 @@ _ROOT_LOCATIONS = {
     '{645FF040-5081-101B-9F08-00AA002F954E}': RECYCLE_BIN,
     '{21EC2020-3AEA-1069-A2DD-08002B30309D}': ROOT_CONTROL_PANEL,
     '{59031A47-3F72-44A7-89C5-5595FE6B30EE}': ROOT_USER,
+    '{4234D49B-0245-4DF3-B780-3893943456E1}': ROOT_UWP_APPS,
 }
 _ROOT_LOCATION_GUIDS = dict((v, k) for k, v in _ROOT_LOCATIONS.items())
 
@@ -299,6 +301,34 @@ class InvalidKeyException(Exception):
     pass
 
 
+def guid_from_bytes(bytes):
+    if len(bytes) != 16:
+        raise FormatException("This is no valid _GUID: %s" % bytes)
+    ordered = [
+        bytes[3], bytes[2], bytes[1], bytes[0],
+        bytes[5], bytes[4], bytes[7], bytes[6],
+        bytes[8], bytes[9], bytes[10], bytes[11],
+        bytes[12], bytes[13], bytes[14], bytes[15]
+    ]
+    return "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}" % tuple([x for x in ordered])
+
+
+def bytes_from_guid(guid):
+    nums = [
+        guid[1:3], guid[3:5], guid[5:7], guid[7:9],
+        guid[10:12], guid[12:14], guid[15:17], guid[17:19],
+        guid[20:22], guid[22:24], guid[25:27], guid[27:29],
+        guid[29:31], guid[31:33], guid[33:35], guid[35:37]
+    ]
+    ordered_nums = [
+        nums[3], nums[2], nums[1], nums[0],
+        nums[5], nums[4], nums[7], nums[6],
+        nums[8], nums[9], nums[10], nums[11],
+        nums[12], nums[13], nums[14], nums[15],
+    ]
+    return bytes([int(x, 16) for x in ordered_nums])
+
+
 def assert_lnk_signature(f):
     f.seek(0)
     sig = f.read(4)
@@ -427,15 +457,8 @@ class RootEntry(object):
             root_type = root[0]
             index = root[1]
             guid_bytes = root[2:18]
-            bytes = guid_bytes
-            if len(bytes) != 16:
-                raise FormatException("This is no valid _GUID: %s" % bytes)
-            ordered = [bytes[3], bytes[2], bytes[1], bytes[0], bytes[5], bytes[4],
-                       bytes[7], bytes[6], bytes[8], bytes[9], bytes[10], bytes[11],
-                       bytes[12], bytes[13], bytes[14], bytes[15]]
-            self.guid = "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}" % tuple(
-                   [x for x in ordered])
-            self.root = _ROOT_LOCATIONS.get(self.guid, "UNKNOWN")
+            self.guid = guid_from_bytes(guid_bytes)
+            self.root = _ROOT_LOCATIONS.get(self.guid, f"UNKNOWN {self.guid}")
             # if self.root == "UNKNOWN":
             #     self.root = _ROOT_INDEX.get(index, "UNKNOWN")
 
@@ -537,7 +560,8 @@ class PathSegmentEntry(object):
                     else:
                         self.localized_name = read_cstring(buf)
                 version_offset = read_short(buf)
-    
+
+    @classmethod
     def create_for_path(cls, path):
         entry = cls()
         entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
@@ -549,8 +573,7 @@ class PathSegmentEntry(object):
         entry.accessed = datetime.fromtimestamp(st.st_atime)
         entry.full_name = entry.short_name
         return entry
-    create_for_path = classmethod(create_for_path)
-    
+
     def _validate(self):
         if self.type is None:
             raise MissingInformationException("Type is missing, choose either TYPE_FOLDER or TYPE_FILE.")
@@ -644,18 +667,20 @@ class UwpSubBlock:
         'string': [0x11, 0x15, 0x05, 0x0f, 0x0c, 0x02, 0x0d, 0x13, 0x0b, 0x14, 0x0a],
     }
 
-    def __init__(self, bytes=None):
+    def __init__(self, bytes=None, type=None, value=None):
         self._data = bytes or b''
-        self.type = None
+        self.type = type
+        self.value = value
         self.name = None
-        self.value = None
+        if self.type is not None:
+            self.name = self.block_names.get(self.type, 'UNKNOWN')
         if not bytes:
             return
         buf = BytesIO(bytes)
         self.type = read_byte(buf)
         self.name = self.block_names.get(self.type, 'UNKNOWN')
 
-        self.value = self._data
+        self.value = self._data[1:]  # skip type
         if self.type in self.block_types['string']:
             unknown = read_int(buf)
             probably_type = read_int(buf)
@@ -664,7 +689,7 @@ class UwpSubBlock:
                 self.value = read_cunicode(buf)
 
     def __str__(self):
-        string = f'UwpSubBlock {self.name}: {self.value}'
+        string = f'UwpSubBlock {self.name} ({hex(self.type)}): {self.value}'
         return string.strip()
 
     @property
@@ -684,6 +709,7 @@ class UwpSubBlock:
                     write_short(0, out)
 
             elif isinstance(self.value, bytes):
+                write_byte(self.type, out)
                 out.write(self.value)
 
         result = out.getvalue()
@@ -693,14 +719,15 @@ class UwpSubBlock:
 class UwpMainBlock:
     magic = b'\x31\x53\x50\x53'
 
-    def __init__(self, bytes=None):
+    def __init__(self, bytes=None, guid: Optional[str] = None, blocks=None):
         self._data = bytes or b''
-        self._blocks = []
+        self._blocks = blocks or []
+        self.guid: str = guid
         if not bytes:
             return
         buf = BytesIO(bytes)
         magic = buf.read(4)
-        self.guid = buf.read(16)
+        self.guid = guid_from_bytes(buf.read(16))
         # read sub blocks
         while True:
             sub_block_size = read_int(buf)
@@ -710,7 +737,7 @@ class UwpMainBlock:
             self._blocks.append(UwpSubBlock(sub_block_data))
 
     def __str__(self):
-        string = '<UwpMainBlock>:\n'
+        string = f'<UwpMainBlock> {self.guid}:\n'
         for block in self._blocks:
             string += f'      {block}\n'
         return string.strip()
@@ -720,7 +747,7 @@ class UwpMainBlock:
         blocks_bytes = [block.bytes for block in self._blocks]
         out = BytesIO()
         out.write(self.magic)
-        out.write(self.guid)
+        out.write(bytes_from_guid(self.guid))
         for block in blocks_bytes:
             write_int(len(block) + 4, out)
             out.write(block)
@@ -784,6 +811,29 @@ class UwpSegmentEntry:
 
         result = out.getvalue()
         return result
+
+    @classmethod
+    def create(cls, package_family_name, target, location=None, logo44x44=None):
+        segment = cls()
+
+        blocks = [
+            UwpSubBlock(type=0x11, value=package_family_name),
+            UwpSubBlock(type=0x0e, value=b'\x00\x00\x00\x00\x13\x00\x00\x00\x02\x00\x00\x00'),
+            UwpSubBlock(type=0x05, value=target),
+        ]
+        if location:
+            blocks.append(UwpSubBlock(type=0x0f, value=location))  # need for relative icon path
+        main1 = UwpMainBlock(guid='{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}', blocks=blocks)
+        segment._blocks.append(main1)
+
+        if logo44x44:
+            main2 = UwpMainBlock(
+                guid='{86D40B4D-9069-443C-819A-2A54090DCCEC}',
+                blocks=[UwpSubBlock(type=0x02, value=logo44x44)]
+            )
+            segment._blocks.append(main2)
+
+        return segment
 
 
 class LinkTargetIDList(object):
@@ -1721,6 +1771,40 @@ def from_segment_list(data, lnk_name=None):
         lnk.file_flags.directory = True
     if lnk_name:
         lnk.save(lnk_name)
+    return lnk
+
+
+def build_uwp(
+    package_family_name, target, location=None,logo44x44=None, lnk_name=None,
+) -> Lnk:
+    """
+    :param lnk_name:            ex.: crafted_uwp.lnk
+    :param package_family_name: ex.: Microsoft.WindowsCalculator_10.1910.0.0_x64__8wekyb3d8bbwe
+    :param target:              ex.: Microsoft.WindowsCalculator_8wekyb3d8bbwe!App
+    :param location:            ex.: C:\\Program Files\\WindowsApps\\Microsoft.WindowsCalculator_10.1910.0.0_x64__8wekyb3d8bbwe
+    :param logo44x44:           ex.: Assets\\CalculatorAppList.png
+    """
+    lnk = Lnk()
+    lnk.link_flags._flags['HasLinkTargetIDList'] = True
+    lnk.link_flags._flags['IsUnicode'] = True
+    lnk.link_flags._flags['EnableTargetMetadata'] = True
+
+    lnk.shell_item_id_list = LinkTargetIDList()
+
+    elements = [
+        RootEntry(ROOT_UWP_APPS),
+        UwpSegmentEntry.create(
+            package_family_name=package_family_name,
+            target=target,
+            location=location,
+            logo44x44=logo44x44,
+        )
+    ]
+    lnk.shell_item_id_list.items = elements
+
+    if lnk_name:
+        lnk.file = lnk_name
+        lnk.save()
     return lnk
 
 
