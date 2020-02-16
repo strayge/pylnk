@@ -1,5 +1,4 @@
-# PyLink3
-
+# PyLnk 3
 Python library for reading and writing Windows shortcut files (.lnk).  
 Converted to support python 3.
 
@@ -13,3 +12,11 @@ convenience functions are provided.
 Limitation: Windows knows lots of different types of shortcuts which all have
 different formats. This library currently only supports shortcuts to files and
 folders on the local machine. 
+
+## Changes
+**0.3.0**  
+added support links to UWP apps  
+**0.2.1**  
+released to PyPI  
+**0.2.0**  
+converted to python 3  

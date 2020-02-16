@@ -7,8 +7,8 @@ with open("README.md", "r") as fh:
 
 setup(
     name="pylnk3",
-    version="0.2.1",
-    py_modules=["pylnk"],
+    version="0.3.0",
+    py_modules=["pylnk3"],
     description="Windows LNK File Parser and Creator",
     author="strayge",
     author_email="strayge@gmail.com",
