@@ -933,7 +933,8 @@ class LinkInfo(object):
         else:
             self.size = None
             self.header_size = _LINK_INFO_HEADER_DEFAULT
-            self.remote = None
+            self.local = 0
+            self.remote = 0
             self.offs_local_volume_table = 0
             self.offs_local_base_path = 0
             self.offs_network_volume_table = 0
@@ -966,7 +967,7 @@ class LinkInfo(object):
 
     def make_path(self):
         if self.remote:
-            self._path = self.network_share_name + self.base_name
+            self._path = self.network_share_name + '\\' + self.base_name
         if self.local:
             self._path = self.local_base_path
     
@@ -984,17 +985,17 @@ class LinkInfo(object):
         write_int(self.offs_base_name, lnk)
         if self.remote:
             self._write_network_volume_table(lnk)
-            write_cstring(self.base_name, lnk)
+            write_cstring(self.base_name, lnk, padding=False)
         else:
             self._write_local_volume_table(lnk)
             write_cstring(self.local_base_path, lnk, padding=True)
-        write_byte(0, lnk)
+            write_byte(0, lnk)
     
     def _calculate_sizes_and_offsets(self):
         self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
         self.size = 28 + self.size_base_name
         if self.remote:
-            self.size_network_volume_table = 20 + len(self.network_share_name) + 1
+            self.size_network_volume_table = 20 + len(self.network_share_name) + len(self.base_name) + 1
             self.size += self.size_network_volume_table
             self.offs_local_volume_table = 0
             self.offs_local_base_path = 0
@@ -1060,6 +1061,7 @@ EXTRA_DATA_TYPES = {
     0xA0000008: 'ShimDataBlock',  # size >= 0x00000088
     0xA0000005: 'SpecialFolderDataBlock',  # size 0x00000010
     0xA0000003: 'VistaAndAboveIDListDataBlock',  # size 0x00000060
+    0xA000000C: 'VistaIDListDataBlock',  # size 0x00000173
 }
 
 
@@ -1626,6 +1628,8 @@ class Lnk(object):
 
     @property
     def path(self):
+        if self._link_info:
+            return self._link_info.path
         return self._shell_item_id_list.get_path()
 
     def specify_local_location(self, path, drive_type=None, drive_serial=None, volume_label=None):
@@ -1664,8 +1668,8 @@ class Lnk(object):
             s += "\nCommandline Arguments: %s" % self.arguments
         if self.link_flags.HasIconLocation:
             s += "\nIcon: %s" % self.icon
-        if self.link_flags.HasLinkInfo:
-            s += "\nUsed Path: %s" % self.shell_item_id_list.get_path()
+        if self._link_info:
+            s += "\nUsed Path: %s" % self._link_info.path
         if self.extra_data:
             s += str(self.extra_data)
         return s
@@ -1687,14 +1691,31 @@ def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_
     lnk = create(lnk_name)
     lnk.link_flags._flags['IsUnicode'] = True
     lnk.link_info = None
-    levels = list(path_levels(target_file))
-    elements = [RootEntry(ROOT_MY_COMPUTER),
-                DriveEntry(levels[0])]
-    for level in levels[1:]:
-        segment = PathSegmentEntry.create_for_path(level)
-        elements.append(segment)
-    lnk.shell_item_id_list = LinkTargetIDList()
-    lnk.shell_item_id_list.items = elements
+    if target_file.startswith('\\\\'):
+        # remote link
+        lnk.link_info = LinkInfo()
+        lnk.link_info.remote = 1
+        # extract server + share name from full path
+        path_parts = target_file.split('\\')
+        share_name, base_name = '\\'.join(path_parts[:4]), '\\'.join(path_parts[4:])
+        lnk.link_info.network_share_name = share_name.upper()
+        lnk.link_info.base_name = base_name
+        # somehow it requires EnvironmentVariableDataBlock & HasExpString flag
+        env_data_block = ExtraData_EnvironmentVariableDataBlock()
+        env_data_block.target_ansi = target_file
+        env_data_block.target_unicode = target_file
+        lnk.extra_data = ExtraData(blocks=[env_data_block])
+        lnk.link_flags.HasExpString = True
+    else:
+        # local link
+        levels = list(path_levels(target_file))
+        elements = [RootEntry(ROOT_MY_COMPUTER),
+                    DriveEntry(levels[0])]
+        for level in levels[1:]:
+            segment = PathSegmentEntry.create_for_path(level)
+            elements.append(segment)
+        lnk.shell_item_id_list = LinkTargetIDList()
+        lnk.shell_item_id_list.items = elements
     # lnk.link_flags._flags['HasLinkInfo'] = True
     if arguments:
         lnk.link_flags._flags['HasArguments'] = True
