@@ -5,16 +5,15 @@
 
 # converted to python3 by strayge:
 # https://github.com/strayge/pylnk
-
+import argparse
 import os
 import re
-import sys
 import time
 from datetime import datetime
 from io import BytesIO, IOBase
 from pprint import pformat
 from struct import pack, unpack
-from typing import Optional, Union, Tuple, Dict
+from typing import Dict, Optional, Tuple, Union
 
 DEFAULT_CHARSET = 'cp1251'
 
@@ -1698,7 +1697,10 @@ def create(f=None):
     return lnk
 
 
-def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0, work_dir=None):
+def for_file(
+    target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0,
+    work_dir=None, window_mode=None,
+):
     lnk = create(lnk_name)
     lnk.link_flags.IsUnicode = True
     lnk.link_info = None
@@ -1741,6 +1743,8 @@ def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_
     if work_dir:
         lnk.link_flags.HasWorkingDir = True
         lnk.work_dir = work_dir
+    if window_mode:
+        lnk.window_mode = window_mode
     if lnk_name:
         lnk.save()
     return lnk
@@ -1847,48 +1851,64 @@ def get_prop(obj, prop_queue):
     return attr
 
 
-def usage_and_exit():
-    usage = """usage: pylnk.py c[reate] TARGETFILE LNKFILE
-       pylnk.py p[arse] LNKFILE [PROPERTY[, PROPERTY[, ...]]]"""
-    print(usage)
-    sys.exit(1)
-
-
 if __name__ == "__main__":
-    # lnk = parse('temp_1.lnk.q')
-    # print(lnk)
-    # lnk.save('result.lnk.1')
-    # lnk = parse('result.lnk.1')
-    # print(lnk)
-    # exit(0)
+    parser = argparse.ArgumentParser(add_help=False)
+    subparsers = parser.add_subparsers(dest='action', metavar='{p, c, d}')
+    parser.add_argument('--help', '-h', action='store_true')
 
-    if len(sys.argv) == 1:
-        usage_and_exit()
-    if sys.argv[1] in ['h', '-h', '--help']:
-        usage_and_exit()
-    action = sys.argv[1]
-    if action not in ['c', 'create', 'p', 'parse', 'd']:
-        print("unknown action: " + action)
-        usage_and_exit()
-    if action.startswith('c'):
-        if len(sys.argv) < 4:
-            usage_and_exit()
-        for_file(sys.argv[2], sys.argv[3])
-    elif action.startswith('p'):
-        if len(sys.argv) < 3:
-            usage_and_exit()
-        lnk = parse(sys.argv[2])
-        props = sys.argv[3:]
+    parser_parse = subparsers.add_parser('parse', aliases=['p'], help='read lnk file')
+    parser_parse.add_argument('filename', help='lnk filename to read')
+    parser_parse.add_argument('props', nargs='*', help='props path to read')
+
+    parser_create = subparsers.add_parser('create', aliases=['c'], help='create new lnk file')
+    parser_create.add_argument('target', help='target path')
+    parser_create.add_argument('name', help='lnk filename to create')
+    parser_create.add_argument('--arguments', '-a', nargs='?', help='additional arguments')
+    parser_create.add_argument('--description', '-d', nargs='?', help='description')
+    parser_create.add_argument('--icon', '-i', nargs='?', help='icon filename')
+    parser_create.add_argument('--icon-index', '-ii', type=int, default=0, nargs='?', help='icon index')
+    parser_create.add_argument('--workdir', '-w', nargs='?', help='working directory')
+    parser_create.add_argument('--mode', '-m', nargs='?', choices=['Maximized', 'Normal', 'Minimized'], help='window mode')
+
+    parser_dup = subparsers.add_parser('duplicate', aliases=['d'], help='read and write lnk file')
+    parser_dup.add_argument('filename', help='lnk filename to read')
+    parser_dup.add_argument('new_filename', help='new filename to write')
+
+    args = parser.parse_args()
+    if args.help or not args.action:
+        print('''
+Tool for read or create .lnk files
+
+usage: pylnk3.py [p]arse / [c]reate ...
+
+Examples:
+pylnk3 p filename.lnk
+pylnk3 c c:\\prog.exe shortcut.lnk
+pylnk3 c \\\\192.168.1.1\\share\\file.doc doc.lnk
+pylnk3 create c:\\1.txt text.lnk -m Minimized -d "Description"
+
+for more info use help for each action (ex.: "pylnk3 create -h")
+        '''.strip())
+        exit(1)
+
+    if args.action in ['create', 'c']:
+        for_file(
+            args.target, args.name, arguments=args.arguments,
+            description=args.description, icon_file=args.icon,
+            icon_index=args.icon_index, work_dir=args.workdir,
+            window_mode=args.mode,
+        )
+    elif args.action in ['parse', 'p']:
+        lnk = parse(args.filename)
+        props = args.props
         if len(props) == 0:
             print(lnk)
         else:
             for prop in props:
                 print(get_prop(lnk, prop.split('.')))
-    elif action.startswith('d'):
-        if len(sys.argv) < 3:
-            usage_and_exit()
-        lnk = parse(sys.argv[2])
-        new_filename = sys.argv[3]
+    elif args.action in ['d', 'duplicate']:
+        lnk = parse(args.filename)
+        new_filename = args.new_filename
         print(lnk)
         lnk.save(new_filename)
         print('saved')
