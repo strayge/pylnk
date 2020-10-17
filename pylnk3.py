@@ -1693,7 +1693,7 @@ def create(f=None):
 
 def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0, work_dir=None):
     lnk = create(lnk_name)
-    lnk.link_flags._flags['IsUnicode'] = True
+    lnk.link_flags.IsUnicode = True
     lnk.link_info = None
     if target_file.startswith('\\\\'):
         # remote link
@@ -1720,19 +1720,19 @@ def for_file(target_file, lnk_name=None, arguments=None, description=None, icon_
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
-    # lnk.link_flags._flags['HasLinkInfo'] = True
+    # lnk.link_flags.HasLinkInfo = True
     if arguments:
-        lnk.link_flags._flags['HasArguments'] = True
+        lnk.link_flags.HasArguments = True
         lnk.arguments = arguments
     if description:
-        lnk.link_flags._flags['HasName'] = True
+        lnk.link_flags.HasName = True
         lnk.description = description
     if icon_file:
-        lnk.link_flags._flags['HasIconLocation'] = True
+        lnk.link_flags.HasIconLocation = True
         lnk.icon = icon_file
     lnk.icon_index = icon_index
     if work_dir:
-        lnk.link_flags._flags['HasWorkingDir'] = True
+        lnk.link_flags.HasWorkingDir = True
         lnk.work_dir = work_dir
     if lnk_name:
         lnk.save()
@@ -1810,9 +1810,9 @@ def build_uwp(
     :param logo44x44:           ex.: Assets\\CalculatorAppList.png
     """
     lnk = Lnk()
-    lnk.link_flags._flags['HasLinkTargetIDList'] = True
-    lnk.link_flags._flags['IsUnicode'] = True
-    lnk.link_flags._flags['EnableTargetMetadata'] = True
+    lnk.link_flags.HasLinkTargetIDList = True
+    lnk.link_flags.IsUnicode = True
+    lnk.link_flags.EnableTargetMetadata = True
 
     lnk.shell_item_id_list = LinkTargetIDList()
 
