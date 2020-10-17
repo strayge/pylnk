@@ -565,12 +565,19 @@ class PathSegmentEntry(object):
     def create_for_path(cls, path):
         entry = cls()
         entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
-        st = os.stat(path)
-        entry.file_size = st.st_size
-        entry.modified = datetime.fromtimestamp(st.st_mtime)
+        try:
+            st = os.stat(path)
+            entry.file_size = st.st_size
+            entry.modified = datetime.fromtimestamp(st.st_mtime)
+            entry.created = datetime.fromtimestamp(st.st_ctime)
+            entry.accessed = datetime.fromtimestamp(st.st_atime)
+        except FileNotFoundError:
+            now = datetime.now()
+            entry.file_size = 0
+            entry.modified = now
+            entry.created = now
+            entry.accessed = now
         entry.short_name = os.path.split(path)[1]
-        entry.created = datetime.fromtimestamp(st.st_ctime)
-        entry.accessed = datetime.fromtimestamp(st.st_atime)
         entry.full_name = entry.short_name
         return entry
 
