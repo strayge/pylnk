@@ -6,6 +6,7 @@
 # converted to python3 by strayge:
 # https://github.com/strayge/pylnk
 import argparse
+import ntpath
 import os
 import re
 import time
@@ -354,7 +355,7 @@ def is_lnk(f):
 
 
 def path_levels(p):
-    dirname, base = os.path.split(p)
+    dirname, base = ntpath.split(p)
     if base != '':
         for level in path_levels(dirname):
             yield level
@@ -576,7 +577,7 @@ class PathSegmentEntry(object):
             entry.modified = now
             entry.created = now
             entry.accessed = now
-        entry.short_name = os.path.split(path)[1]
+        entry.short_name = ntpath.split(path)[1]
         entry.full_name = entry.short_name
         return entry
 
