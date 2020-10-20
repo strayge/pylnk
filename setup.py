@@ -1,5 +1,4 @@
-import setuptools
-from distutils.core import setup
+from setuptools import setup
 
 
 with open("README.md", "r") as fh:
@@ -7,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="pylnk3",
-    version="0.3.0",
+    version="0.4.0",
     py_modules=["pylnk3"],
     entry_points={
         'console_scripts': [
@@ -21,13 +20,16 @@ setup(
     keywords=["lnk", "shortcut", "windows"],
     license="GNU Library or Lesser General Public License (LGPL)",
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    python_requires='>=3',
+    python_requires='>=3.6',
     long_description=long_description,
     long_description_content_type="text/markdown",
 )
