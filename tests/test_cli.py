@@ -3,7 +3,7 @@ import subprocess
 import sys
 from typing import Optional
 
-from pylnk3.pylnk3 import Lnk
+from pylnk3 import Lnk
 
 
 def quote_cmd(line: str) -> str:
@@ -13,7 +13,7 @@ def quote_cmd(line: str) -> str:
 
 
 def call_cli(params: str) -> Optional[str]:
-    exec_path = os.path.join('pylnk3', 'pylnk3.py')
+    exec_path = 'pylnk3.py'
     result = subprocess.run(
         f'python {exec_path} {params}', check=True, shell=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
