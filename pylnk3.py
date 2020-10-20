@@ -1852,7 +1852,7 @@ def get_prop(obj, prop_queue):
     return attr
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(add_help=False)
     subparsers = parser.add_subparsers(dest='action', metavar='{p, c, d}')
     parser.add_argument('--help', '-h', action='store_true')
@@ -1913,3 +1913,7 @@ for more info use help for each action (ex.: "pylnk3 create -h")
         print(lnk)
         lnk.save(new_filename)
         print('saved')
+
+
+if __name__ == '__main__':
+    cli()

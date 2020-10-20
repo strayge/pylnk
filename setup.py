@@ -9,6 +9,11 @@ setup(
     name="pylnk3",
     version="0.3.0",
     py_modules=["pylnk3"],
+    entry_points={
+        'console_scripts': [
+            'pylnk3 = pylnk3:cli',
+        ],
+    },
     description="Windows LNK File Parser and Creator",
     author="strayge",
     author_email="strayge@gmail.com",
