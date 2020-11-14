@@ -1635,13 +1635,20 @@ class Lnk(object):
 
     @property
     def path(self):
-        # it's possible to have network path in _link_info and local path in _shell_item_id_list
-        # (link to file on mounted network share)
-        # so local path should be checked first (as it has priority in explorer)
-        if hasattr(self, '_shell_item_id_list'):
-            return self._shell_item_id_list.get_path()
-        if self._link_info:
-            return self._link_info.path
+        # lnk can contains several different paths at different structures
+        # here is some logic consistent with link properties at explorer (at least on test examples)
+
+        link_info_path = self._link_info.path if self._link_info and self._link_info.path else None
+        id_list_path = self._shell_item_id_list.get_path() if hasattr(self, '_shell_item_id_list') else None
+
+        if id_list_path and id_list_path.startswith('%MY_COMPUTER%'):
+            # full local path has priority
+            return id_list_path[14:]
+        if link_info_path:
+            # local path at link_info_path has priority over network path at id_list_path
+            # full local path at link_info_path has priority over partial path at id_list_path
+            return link_info_path
+        return id_list_path
 
     def specify_local_location(self, path, drive_type=None, drive_serial=None, volume_label=None):
         self._link_info.drive_type = drive_type or DRIVE_UNKNOWN

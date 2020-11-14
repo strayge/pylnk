@@ -60,6 +60,7 @@ __pypackages__/
 .venv
 env/
 venv/
+venv_*/
 ENV/
 env.bak/
 venv.bak/

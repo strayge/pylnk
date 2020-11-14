@@ -25,7 +25,7 @@ def test_cli_create_local(temp_filename):
     path = 'C:\\folder\\file.txt'
     call_cli(f'c {quote_cmd(path)} {temp_filename}')
     lnk = Lnk(temp_filename)
-    assert lnk.path == f'%MY_COMPUTER%\\{path}'
+    assert lnk.path == path
 
 
 def test_cli_create_net(temp_filename):
