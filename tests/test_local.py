@@ -52,3 +52,13 @@ def test_local_folder_link(examples_path, temp_filename):
     lnk.save(temp_filename)
     lnk2 = Lnk(temp_filename)
     assert lnk2.path == path
+
+
+def test_local_send_to_fax(examples_path, temp_filename):
+    filename = os.path.join(examples_path, 'send_to_fax.lnk')
+    path = '%windir%\\system32\\WFS.exe'
+    lnk = Lnk(filename)
+    assert lnk.path == path
+    lnk.save(temp_filename)
+    lnk2 = Lnk(temp_filename)
+    assert lnk2.path == path

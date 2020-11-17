@@ -1641,6 +1641,13 @@ class Lnk(object):
         link_info_path = self._link_info.path if self._link_info and self._link_info.path else None
         id_list_path = self._shell_item_id_list.get_path() if hasattr(self, '_shell_item_id_list') else None
 
+        env_var_path = None
+        if self.extra_data and self.extra_data.blocks:
+            for block in self.extra_data.blocks:
+                if type(block) == ExtraData_EnvironmentVariableDataBlock:
+                    env_var_path = block.target_unicode.strip('\x00') or block.target_ansi.strip('\x00')
+                    break
+
         if id_list_path and id_list_path.startswith('%MY_COMPUTER%'):
             # full local path has priority
             return id_list_path[14:]
@@ -1648,6 +1655,9 @@ class Lnk(object):
             # local path at link_info_path has priority over network path at id_list_path
             # full local path at link_info_path has priority over partial path at id_list_path
             return link_info_path
+        if env_var_path:
+            # some links in Recent folder contains path only at ExtraData_EnvironmentVariableDataBlock
+            return env_var_path
         return id_list_path
 
     def specify_local_location(self, path, drive_type=None, drive_serial=None, volume_label=None):
@@ -1687,7 +1697,7 @@ class Lnk(object):
         if self.link_flags.HasIconLocation:
             s += "\nIcon: %s" % self.icon
         if self._link_info:
-            s += "\nUsed Path: %s" % self._link_info.path
+            s += "\nUsed Path: %s" % self.path
         if self.extra_data:
             s += str(self.extra_data)
         return s
