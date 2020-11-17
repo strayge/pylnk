@@ -1,4 +1,9 @@
 # PyLnk 3
+
+[![PyPI version shields.io](https://img.shields.io/pypi/v/pylnk3.svg)](https://pypi.python.org/pypi/pylnk3/)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/pylnk3.svg)](https://pypi.python.org/pypi/pylnk3/)
+[![PyPI download month](https://img.shields.io/pypi/dm/pylnk3.svg)](https://pypi.python.org/pypi/pylnk3/)
+
 Python library for reading and writing Windows shortcut files (.lnk).  
 Converted to support python 3.
 
