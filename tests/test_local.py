@@ -62,3 +62,23 @@ def test_local_send_to_fax(examples_path, temp_filename):
     lnk.save(temp_filename)
     lnk2 = Lnk(temp_filename)
     assert lnk2.path == path
+
+
+def test_local_recent1(examples_path, temp_filename):
+    filename = os.path.join(examples_path, 'recent1.lnk')
+    path = 'C:\\Users\\heznik\\Downloads\\2020M09_01_contract.pdf'
+    lnk = Lnk(filename)
+    assert lnk.path == path
+    # lnk.save(temp_filename)
+    # lnk2 = Lnk(temp_filename)
+    # assert lnk2.path == path
+
+
+def test_local_recent2(examples_path, temp_filename):
+    filename = os.path.join(examples_path, 'recent2.lnk')
+    path = 'C:\\Users\\stray\\Downloads\\catastrophe_89f317b5c3.7z'
+    lnk = Lnk(filename)
+    assert lnk.path == path
+    # lnk.save(temp_filename)
+    # lnk2 = Lnk(temp_filename)
+    # assert lnk2.path == path

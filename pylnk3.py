@@ -132,6 +132,7 @@ _ROOT_LOCATION_GUIDS = dict((v, k) for k, v in _ROOT_LOCATIONS.items())
 TYPE_FOLDER = 'FOLDER'
 TYPE_FILE = 'FILE'
 _ENTRY_TYPES = {
+    0x00: 'KNOWN_FOLDER',
     0x31: 'FOLDER',
     0x32: 'FILE',
     0x35: 'FOLDER (UNICODE)',
@@ -522,6 +523,17 @@ class PathSegmentEntry(object):
         buf = BytesIO(bytes)
         self.type = _ENTRY_TYPES.get(read_short(buf), 'UNKNOWN')
         short_name_is_unicode = self.type.endswith('(UNICODE)')
+
+        if self.type == 'KNOWN_FOLDER':
+            _ = read_short(buf)  # extra block size
+            extra_signature = read_int(buf)
+            if extra_signature == 0x23FEBBEE:
+                _ = read_short(buf)  # unknown
+                _ = read_short(buf)  # guid len
+                # right now contains guid for "known folder" instead of actual path
+                self.full_name = guid_from_bytes(buf.read(16))
+            return
+
         self.file_size = read_int(buf)
         self.modified = read_dos_datetime(buf)
         unknown = read_short(buf)  # FileAttributesL
@@ -857,13 +869,18 @@ class LinkTargetIDList(object):
             self._interpret(raw)
     
     def _interpret(self, raw):
-        # if len(raw[0]) == 0x12:
         if raw[0][0] == 0x1F:
             self.items.append(RootEntry(raw[0]))
             if self.items[0].root == ROOT_MY_COMPUTER:
-                if not len(raw[1]) == 0x17:
+                if len(raw[1]) == 0x17:
+                    self.items.append(DriveEntry(raw[1]))
+                elif len(raw[1]) == 0x38:
+                    # FIXME: here is unknown structure pointed to some KNOWN_FOLDER (guid?)
+                    entry = PathSegmentEntry()
+                    entry.full_name = '<UNKNOWN_PATH>'
+                    self.items.append(entry)
+                else:
                     raise ValueError("This seems to be an absolute link which requires a drive as second element.")
-                self.items.append(DriveEntry(raw[1]))
                 items = raw[2:]
             elif self.items[0].root == ROOT_NETWORK_PLACES:
                 raise NotImplementedError(
