@@ -141,6 +141,7 @@ _ENTRY_TYPES = {
     0x1f: 'ROOT_FOLDER',
     0x61: 'URI',
     0x71: 'CONTROL_PANEL',
+    0x802E: 'ROOT_KNOWN_FOLDER',
 }
 _ENTRY_TYPE_IDS = dict((v, k) for k, v in _ENTRY_TYPES.items())
 
@@ -524,14 +525,25 @@ class PathSegmentEntry(object):
         self.type = _ENTRY_TYPES.get(read_short(buf), 'UNKNOWN')
         short_name_is_unicode = self.type.endswith('(UNICODE)')
 
+        if self.type == 'ROOT_KNOWN_FOLDER':
+            self.full_name = '::' + guid_from_bytes(buf.read(16))
+            # then followed Beef0026 structure:
+            # short size
+            # short version
+            # int signature == 0xBEEF0026
+            # (16 bytes) created timestamp
+            # (16 bytes) modified timestamp
+            # (16 bytes) accessed timestamp
+            return
+
         if self.type == 'KNOWN_FOLDER':
             _ = read_short(buf)  # extra block size
             extra_signature = read_int(buf)
             if extra_signature == 0x23FEBBEE:
                 _ = read_short(buf)  # unknown
                 _ = read_short(buf)  # guid len
-                # right now contains guid for "known folder" instead of actual path
-                self.full_name = guid_from_bytes(buf.read(16))
+                # that format recognized by explorer
+                self.full_name = '::' + guid_from_bytes(buf.read(16))
             return
 
         self.file_size = read_int(buf)
@@ -874,11 +886,8 @@ class LinkTargetIDList(object):
             if self.items[0].root == ROOT_MY_COMPUTER:
                 if len(raw[1]) == 0x17:
                     self.items.append(DriveEntry(raw[1]))
-                elif len(raw[1]) == 0x38:
-                    # FIXME: here is unknown structure pointed to some KNOWN_FOLDER (guid?)
-                    entry = PathSegmentEntry()
-                    entry.full_name = '<UNKNOWN_PATH>'
-                    self.items.append(entry)
+                elif raw[1][0:2] == b'\x2E\x80':  # ROOT_KNOWN_FOLDER
+                    self.items.append(PathSegmentEntry(raw[1]))
                 else:
                     raise ValueError("This seems to be an absolute link which requires a drive as second element.")
                 items = raw[2:]
@@ -1667,6 +1676,9 @@ class Lnk(object):
 
         if id_list_path and id_list_path.startswith('%MY_COMPUTER%'):
             # full local path has priority
+            return id_list_path[14:]
+        if id_list_path and id_list_path.startswith('%USERPROFILE%\\::'):
+            # path to KNOWN_FOLDER also has priority over link_info
             return id_list_path[14:]
         if link_info_path:
             # local path at link_info_path has priority over network path at id_list_path
