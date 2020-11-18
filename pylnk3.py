@@ -137,11 +137,11 @@ _ENTRY_TYPES = {
     0x32: 'FILE',
     0x35: 'FOLDER (UNICODE)',
     0x36: 'FILE (UNICODE)',
+    0x802E: 'ROOT_KNOWN_FOLDER',
     # founded in doc, not tested
     0x1f: 'ROOT_FOLDER',
     0x61: 'URI',
     0x71: 'CONTROL_PANEL',
-    0x802E: 'ROOT_KNOWN_FOLDER',
 }
 _ENTRY_TYPE_IDS = dict((v, k) for k, v in _ENTRY_TYPES.items())
 
@@ -609,7 +609,7 @@ class PathSegmentEntry(object):
         if self.type is None:
             raise MissingInformationException("Type is missing, choose either TYPE_FOLDER or TYPE_FILE.")
         if self.file_size is None:
-            if self.type.startswith('FOLDER'):
+            if self.type.startswith('FOLDER') or self.type in ['KNOWN_FOLDER', 'ROOT_KNOWN_FOLDER']:
                 self.file_size = 0
             else:
                 raise MissingInformationException("File size missing")
@@ -633,6 +633,29 @@ class PathSegmentEntry(object):
         self._validate()
         out = BytesIO()
         entry_type = self.type
+
+        if entry_type == 'KNOWN_FOLDER':
+            write_short(_ENTRY_TYPE_IDS[entry_type], out)
+            write_short(0x1A, out)  # size
+            write_int(0x23FEBBEE, out)  # extra signature
+            write_short(0x00, out)  # extra signature
+            write_short(0x10, out)  # guid size
+            out.write(bytes_from_guid(self.full_name.strip(':')))
+            return out.getvalue()
+
+        if entry_type == 'ROOT_KNOWN_FOLDER':
+            write_short(_ENTRY_TYPE_IDS[entry_type], out)
+            out.write(bytes_from_guid(self.full_name.strip(':')))
+            write_short(0x26, out)  # 0xBEEF0026 structure size
+            write_short(0x01, out)  # version
+            write_int(0xBEEF0026, out)  # extra signature
+            write_int(0x11, out)  # some flag for containing datetime
+            write_double(0x00, out)  # created datetime
+            write_double(0x00, out)  # modified datetime
+            write_double(0x00, out)  # accessed datetime
+            write_short(0x14, out)  # unknown
+            return out.getvalue()
+
         short_name_len = len(self.short_name) + 1
         try:
             self.short_name.encode("ascii")
@@ -921,9 +944,12 @@ class LinkTargetIDList(object):
         return '\\'.join(segments)
     
     def _validate(self):
-        if type(self.items[0]) == RootEntry:
-            if self.items[0].root == ROOT_MY_COMPUTER and type(self.items[1]) != DriveEntry:
-                raise ValueError("A drive is required for absolute lnks")
+        if type(self.items[0]) == RootEntry and self.items[0].root == ROOT_MY_COMPUTER:
+            if type(self.items[1]) == DriveEntry:
+                return
+            if type(self.items[1]) == PathSegmentEntry and self.items[1].full_name.startswith('::'):
+                return
+            raise ValueError("A drive is required for absolute lnks")
 
     @property
     def bytes(self):

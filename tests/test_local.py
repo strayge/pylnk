@@ -69,9 +69,9 @@ def test_local_recent1(examples_path, temp_filename):
     path = '::{374DE290-123F-4565-9164-39C4925E467B}\\2020M09_01_contract.pdf'
     lnk = Lnk(filename)
     assert lnk.path == path
-    # lnk.save(temp_filename)
-    # lnk2 = Lnk(temp_filename)
-    # assert lnk2.path == path
+    lnk.save(temp_filename)
+    lnk2 = Lnk(temp_filename)
+    assert lnk2.path == path
 
 
 def test_local_recent2(examples_path, temp_filename):
@@ -79,6 +79,6 @@ def test_local_recent2(examples_path, temp_filename):
     path = '::{088E3905-0323-4B02-9826-5D99428E115F}\\catastrophe_89f317b5c3.7z'
     lnk = Lnk(filename)
     assert lnk.path == path
-    # lnk.save(temp_filename)
-    # lnk2 = Lnk(temp_filename)
-    # assert lnk2.path == path
+    lnk.save(temp_filename)
+    lnk2 = Lnk(temp_filename)
+    assert lnk2.path == path
