@@ -1047,7 +1047,7 @@ class LinkInfo(object):
             write_cstring(self.base_name, lnk, padding=False)
         else:
             self._write_local_volume_table(lnk)
-            write_cstring(self.local_base_path, lnk, padding=True)
+            write_cstring(self.local_base_path, lnk, padding=False)
             write_byte(0, lnk)
     
     def _calculate_sizes_and_offsets(self):
