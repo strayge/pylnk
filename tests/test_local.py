@@ -82,3 +82,13 @@ def test_local_recent2(examples_path, temp_filename):
     lnk.save(temp_filename)
     lnk2 = Lnk(temp_filename)
     assert lnk2.path == path
+
+
+def test_empty_idlist(examples_path, temp_filename):
+    filename = os.path.join(examples_path, 'desktop.lnk')
+    path = 'C:\\Users\\heznik\\Desktop'
+    lnk = Lnk(filename)
+    assert lnk.path == path
+    lnk.save(temp_filename)
+    lnk2 = Lnk(temp_filename)
+    assert lnk2.path == path

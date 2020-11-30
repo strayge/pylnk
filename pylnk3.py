@@ -904,7 +904,9 @@ class LinkTargetIDList(object):
             self._interpret(raw)
     
     def _interpret(self, raw):
-        if raw[0][0] == 0x1F:
+        if not raw:
+            return
+        elif raw[0][0] == 0x1F:
             self.items.append(RootEntry(raw[0]))
             if self.items[0].root == ROOT_MY_COMPUTER:
                 if len(raw[1]) == 0x17:
@@ -944,6 +946,8 @@ class LinkTargetIDList(object):
         return '\\'.join(segments)
     
     def _validate(self):
+        if not len(self.items):
+            return
         if type(self.items[0]) == RootEntry and self.items[0].root == ROOT_MY_COMPUTER:
             if type(self.items[1]) == DriveEntry:
                 return
