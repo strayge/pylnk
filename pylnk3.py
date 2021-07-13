@@ -1177,7 +1177,7 @@ class ExtraData_IconEnvironmentDataBlock(object):
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
-        self.target_ansi = buf.read(260).decode()
+        self.target_ansi = buf.read(260).decode('ansi')
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
