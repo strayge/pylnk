@@ -92,3 +92,16 @@ def test_empty_idlist(examples_path, temp_filename):
     lnk.save(temp_filename)
     lnk2 = Lnk(temp_filename)
     assert lnk2.path == path
+
+
+def test_diacritic_symbols_in_path(examples_path, temp_filename):
+    """Read / write utf-8 characters into LinkInfo path."""
+    filename = os.path.join(examples_path, 'diacritic_symbols.lnk')
+    path = 'D:\\ööö\\äöüàéèíïóòúü.txt'
+    lnk = Lnk(filename)
+    assert lnk.path == path
+    assert lnk._link_info.path == path
+    lnk.save(temp_filename)
+    lnk2 = Lnk(temp_filename)
+    assert lnk2.path == path
+    assert lnk2._link_info.path == path
