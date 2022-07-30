@@ -374,12 +374,12 @@ def is_drive(data):
 # ---- data structures
 
 class Flags(object):
-    
+
     def __init__(self, flag_names: Tuple[str, ...], flags_bytes=0):
         self._flag_names = flag_names
         self._flags: Dict[str, bool] = dict([(name, False) for name in flag_names])
         self.set_flags(flags_bytes)
-    
+
     def set_flags(self, flags_bytes):
         for pos, flag_name in enumerate(self._flag_names):
             self._flags[flag_name] = bool(flags_bytes >> pos & 0x1)
@@ -390,22 +390,22 @@ class Flags(object):
         for pos in range(len(self._flag_names)):
             bytes = (self._flags[self._flag_names[pos]] and 1 or 0) << pos | bytes
         return bytes
-    
+
     def __getitem__(self, key):
         if key in self._flags:
             return object.__getattribute__(self, '_flags')[key]
         return object.__getattribute__(self, key)
-    
+
     def __setitem__(self, key, value):
         if key not in self._flags:
             raise KeyError("The key '%s' is not defined for those flags." % key)
         self._flags[key] = value
-    
+
     def __getattr__(self, key):
         if key in self._flags:
             return object.__getattribute__(self, '_flags')[key]
         return object.__getattribute__(self, key)
-    
+
     def __setattr__(self, key, value):
         if '_flags' not in self.__dict__:
             object.__setattr__(self, key, value)
@@ -419,10 +419,10 @@ class Flags(object):
 
 
 class ModifierKeys(Flags):
-    
+
     def __init__(self, flags_bytes=0):
         Flags.__init__(self, _MODIFIER_KEYS, flags_bytes)
-    
+
     def __str__(self):
         s = ""
         s += self.CONTROL and "CONTROL+" or ""
@@ -446,7 +446,7 @@ class ModifierKeys(Flags):
 
 
 class RootEntry(object):
-    
+
     def __init__(self, root):
         if root is not None:
             # create from text representation
@@ -480,7 +480,7 @@ class RootEntry(object):
 
 
 class DriveEntry(object):
-    
+
     def __init__(self, drive: str):
         if len(drive) == 23:
             # binary data from parsed lnk
@@ -509,7 +509,7 @@ class DriveEntry(object):
 
 
 class PathSegmentEntry(object):
-    
+
     def __init__(self, bytes=None):
         self.type = None
         self.file_size = None
@@ -891,7 +891,7 @@ class UwpSegmentEntry:
 
 
 class LinkTargetIDList(object):
-    
+
     def __init__(self, bytes=None):
         self.items = []
         if bytes is not None:
@@ -902,7 +902,7 @@ class LinkTargetIDList(object):
                 raw.append(buf.read(entry_len - 2))  # the length includes the size
                 entry_len = read_short(buf)
             self._interpret(raw)
-    
+
     def _interpret(self, raw):
         if not raw:
             return
@@ -930,7 +930,7 @@ class LinkTargetIDList(object):
                 self.items.append(UwpSegmentEntry(item))
             else:
                 self.items.append(PathSegmentEntry(item))
-    
+
     def get_path(self):
         segments = []
         for item in self.items:
@@ -944,7 +944,7 @@ class LinkTargetIDList(object):
             else:
                 segments.append(item)
         return '\\'.join(segments)
-    
+
     def _validate(self):
         if not len(self.items):
             return
@@ -1033,7 +1033,7 @@ class LinkInfo(object):
             self._path = self.network_share_name + '\\' + self.base_name
         if self.local:
             self._path = self.local_base_path
-    
+
     def write(self, lnk):
         if self.remote is None:
             raise MissingInformationException("No location information given.")
@@ -1053,7 +1053,7 @@ class LinkInfo(object):
             self._write_local_volume_table(lnk)
             write_cstring(self.local_base_path, lnk, padding=False)
             write_byte(0, lnk)
-    
+
     def _calculate_sizes_and_offsets(self):
         self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
         self.size = 28 + self.size_base_name
@@ -1072,7 +1072,7 @@ class LinkInfo(object):
             self.offs_local_base_path = self.offs_local_volume_table + self.size_local_volume_table
             self.offs_network_volume_table = 0
             self.offs_base_name = self.offs_local_base_path + self.size_local_base_path
-    
+
     def _write_network_volume_table(self, buf):
         write_int(self.size_network_volume_table, buf)
         write_int(2, buf)  # ?
@@ -1080,7 +1080,7 @@ class LinkInfo(object):
         write_int(0, buf)  # ?
         write_int(131072, buf)  # ?
         write_cstring(self.network_share_name, buf)
-    
+
     def _write_local_volume_table(self, buf):
         write_int(self.size_local_volume_table, buf)
         try:
@@ -1473,7 +1473,7 @@ class ExtraData(object):
 
 
 class Lnk(object):
-    
+
     def __init__(self, f=None):
         self.file = None
         if type(f) == str or type(f) == str:
@@ -1505,14 +1505,14 @@ class Lnk(object):
             self._parse_lnk_file(f)
         if self.file:
             f.close()
-    
+
     def _read_hot_key(self, lnk):
         low = read_byte(lnk)
         high = read_byte(lnk)
         key = _KEYS.get(low, '')
         modifier = high and str(ModifierKeys(high)) or ''
         return modifier + key
-    
+
     def _write_hot_key(self, hot_key, lnk):
         if hot_key is None or not hot_key:
             low = high = 0
@@ -1588,7 +1588,7 @@ class Lnk(object):
         # only close the stream if it's our own
         if not is_file:
             f.close()
-    
+
     def write(self, lnk):
         lnk.write(_SIGNATURE)
         lnk.write(_GUID)
@@ -1679,7 +1679,7 @@ class Lnk(object):
         self._icon = icon
         self.link_flags.HasIconLocation = icon is not None
     icon = property(_get_icon, _set_icon)
-    
+
     def _get_window_mode(self):
         return self._show_command
 
@@ -1726,7 +1726,7 @@ class Lnk(object):
         self._link_info.local_base_path = path
         self._link_info.local = True
         self._link_info.make_path()
-    
+
     def specify_remote_location(self, network_share_name, base_name):
         self._link_info.network_share_name = network_share_name
         self._link_info.base_name = base_name
@@ -1833,7 +1833,7 @@ def from_segment_list(data, lnk_name=None):
     If lnk_name is given, the resulting lnk will be saved
     to a file with that name.
     The expected list for has the following format ("C:\\dir\\file.txt"):
-    
+
     ['c:\\',
      {'type': TYPE_FOLDER,
       'size': 0,            # optional for folders
@@ -1850,7 +1850,7 @@ def from_segment_list(data, lnk_name=None):
       'accessed': datetime.datetime(2012, 10, 12, 23, 28, 11, 8476)
      }
     ]
-    
+
     For relative paths just omit the drive entry.
     Hint: Correct dates really are not crucial for working lnks.
     """
@@ -1922,7 +1922,11 @@ def build_uwp(
 
 
 def get_prop(obj, prop_queue):
-    attr = getattr(obj, prop_queue[0])
+    key = prop_queue[0]
+    if key.isdecimal():
+        attr = obj[int(key)]
+    else:
+        attr = getattr(obj, key)
     if len(prop_queue) > 1:
         return get_prop(attr, prop_queue[1:])
     return attr
