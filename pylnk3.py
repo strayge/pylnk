@@ -98,7 +98,7 @@ _KEYS = {
     0x75: 'F6', 0x76: 'F7', 0x77: 'F8', 0x78: 'F9', 0x79: 'F10', 0x7A: 'F11',
     0x7B: 'F12', 0x7C: 'F13', 0x7D: 'F14', 0x7E: 'F15', 0x7F: 'F16', 0x80: 'F17',
     0x81: 'F18', 0x82: 'F19', 0x83: 'F20', 0x84: 'F21', 0x85: 'F22', 0x86: 'F23',
-    0x87: 'F24', 0x90: 'NUM LOCK', 0x91: 'SCROLL LOCK'
+    0x87: 'F24', 0x90: 'NUM LOCK', 0x91: 'SCROLL LOCK',
 }
 _KEY_CODES = dict((v, k) for k, v in _KEYS.items())
 
@@ -190,7 +190,7 @@ def read_cstring(buf, padding=False):
 def read_sized_string(buf, string=True):
     size = read_short(buf)
     if string:
-        return buf.read(size*2).decode('utf-16-le')
+        return buf.read(size * 2).decode('utf-16-le')
     else:
         return buf.read(size)
 
@@ -262,7 +262,7 @@ def put_bits(bits, target, start, count, length=16):
 
 def write_dos_datetime(val, buf):
     date = time = 0
-    date = put_bits(val.year-1980, date, 0, 7)
+    date = put_bits(val.year - 1980, date, 0, 7)
     date = put_bits(val.month, date, 7, 4)
     date = put_bits(val.day, date, 11, 5)
     time = put_bits(val.hour, time, 0, 5)
@@ -310,7 +310,7 @@ def guid_from_bytes(bytes):
         bytes[3], bytes[2], bytes[1], bytes[0],
         bytes[5], bytes[4], bytes[7], bytes[6],
         bytes[8], bytes[9], bytes[10], bytes[11],
-        bytes[12], bytes[13], bytes[14], bytes[15]
+        bytes[12], bytes[13], bytes[14], bytes[15],
     ]
     return "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}" % tuple([x for x in ordered])
 
@@ -320,7 +320,7 @@ def bytes_from_guid(guid):
         guid[1:3], guid[3:5], guid[5:7], guid[7:9],
         guid[10:12], guid[12:14], guid[15:17], guid[17:19],
         guid[20:22], guid[22:24], guid[25:27], guid[27:29],
-        guid[29:31], guid[31:33], guid[33:35], guid[35:37]
+        guid[29:31], guid[31:33], guid[33:35], guid[35:37],
     ]
     ordered_nums = [
         nums[3], nums[2], nums[1], nums[0],
@@ -374,12 +374,12 @@ def is_drive(data):
 # ---- data structures
 
 class Flags(object):
-    
+
     def __init__(self, flag_names: Tuple[str, ...], flags_bytes=0):
         self._flag_names = flag_names
         self._flags: Dict[str, bool] = dict([(name, False) for name in flag_names])
         self.set_flags(flags_bytes)
-    
+
     def set_flags(self, flags_bytes):
         for pos, flag_name in enumerate(self._flag_names):
             self._flags[flag_name] = bool(flags_bytes >> pos & 0x1)
@@ -390,22 +390,22 @@ class Flags(object):
         for pos in range(len(self._flag_names)):
             bytes = (self._flags[self._flag_names[pos]] and 1 or 0) << pos | bytes
         return bytes
-    
+
     def __getitem__(self, key):
         if key in self._flags:
             return object.__getattribute__(self, '_flags')[key]
         return object.__getattribute__(self, key)
-    
+
     def __setitem__(self, key, value):
         if key not in self._flags:
             raise KeyError("The key '%s' is not defined for those flags." % key)
         self._flags[key] = value
-    
+
     def __getattr__(self, key):
         if key in self._flags:
             return object.__getattribute__(self, '_flags')[key]
         return object.__getattribute__(self, key)
-    
+
     def __setattr__(self, key, value):
         if '_flags' not in self.__dict__:
             object.__setattr__(self, key, value)
@@ -419,10 +419,10 @@ class Flags(object):
 
 
 class ModifierKeys(Flags):
-    
+
     def __init__(self, flags_bytes=0):
         Flags.__init__(self, _MODIFIER_KEYS, flags_bytes)
-    
+
     def __str__(self):
         s = ""
         s += self.CONTROL and "CONTROL+" or ""
@@ -446,7 +446,7 @@ class ModifierKeys(Flags):
 
 
 class RootEntry(object):
-    
+
     def __init__(self, root):
         if root is not None:
             # create from text representation
@@ -467,7 +467,7 @@ class RootEntry(object):
     @property
     def bytes(self):
         guid = self.guid[1:-1].replace('-', '')
-        chars = [bytes([int(x, 16)]) for x in [guid[i:i+2] for i in range(0, 32, 2)]]
+        chars = [bytes([int(x, 16)]) for x in [guid[i:i + 2] for i in range(0, 32, 2)]]
         return (
             b'\x1F\x50'
             + chars[3] + chars[2] + chars[1] + chars[0]
@@ -480,7 +480,7 @@ class RootEntry(object):
 
 
 class DriveEntry(object):
-    
+
     def __init__(self, drive: str):
         if len(drive) == 23:
             # binary data from parsed lnk
@@ -509,7 +509,7 @@ class DriveEntry(object):
 
 
 class PathSegmentEntry(object):
-    
+
     def __init__(self, bytes=None):
         self.type = None
         self.file_size = None
@@ -883,7 +883,7 @@ class UwpSegmentEntry:
         if logo44x44:
             main2 = UwpMainBlock(
                 guid='{86D40B4D-9069-443C-819A-2A54090DCCEC}',
-                blocks=[UwpSubBlock(type=0x02, value=logo44x44)]
+                blocks=[UwpSubBlock(type=0x02, value=logo44x44)],
             )
             segment._blocks.append(main2)
 
@@ -891,7 +891,7 @@ class UwpSegmentEntry:
 
 
 class LinkTargetIDList(object):
-    
+
     def __init__(self, bytes=None):
         self.items = []
         if bytes is not None:
@@ -902,7 +902,7 @@ class LinkTargetIDList(object):
                 raw.append(buf.read(entry_len - 2))  # the length includes the size
                 entry_len = read_short(buf)
             self._interpret(raw)
-    
+
     def _interpret(self, raw):
         if not raw:
             return
@@ -919,7 +919,7 @@ class LinkTargetIDList(object):
             elif self.items[0].root == ROOT_NETWORK_PLACES:
                 raise NotImplementedError(
                     "Parsing network lnks has not yet been implemented. "
-                    "If you need it just contact me and we'll see..."
+                    "If you need it just contact me and we'll see...",
                 )
             else:
                 items = raw[1:]
@@ -930,7 +930,7 @@ class LinkTargetIDList(object):
                 self.items.append(UwpSegmentEntry(item))
             else:
                 self.items.append(PathSegmentEntry(item))
-    
+
     def get_path(self):
         segments = []
         for item in self.items:
@@ -944,7 +944,7 @@ class LinkTargetIDList(object):
             else:
                 segments.append(item)
         return '\\'.join(segments)
-    
+
     def _validate(self):
         if not len(self.items):
             return
@@ -1033,7 +1033,7 @@ class LinkInfo(object):
             self._path = self.network_share_name + '\\' + self.base_name
         if self.local:
             self._path = self.local_base_path
-    
+
     def write(self, lnk):
         if self.remote is None:
             raise MissingInformationException("No location information given.")
@@ -1053,7 +1053,7 @@ class LinkInfo(object):
             self._write_local_volume_table(lnk)
             write_cstring(self.local_base_path, lnk, padding=False)
             write_byte(0, lnk)
-    
+
     def _calculate_sizes_and_offsets(self):
         self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
         self.size = 28 + self.size_base_name
@@ -1072,7 +1072,7 @@ class LinkInfo(object):
             self.offs_local_base_path = self.offs_local_volume_table + self.size_local_volume_table
             self.offs_network_volume_table = 0
             self.offs_base_name = self.offs_local_base_path + self.size_local_base_path
-    
+
     def _write_network_volume_table(self, buf):
         write_int(self.size_network_volume_table, buf)
         write_int(2, buf)  # ?
@@ -1080,7 +1080,7 @@ class LinkInfo(object):
         write_int(0, buf)  # ?
         write_int(131072, buf)  # ?
         write_cstring(self.network_share_name, buf)
-    
+
     def _write_local_volume_table(self, buf):
         write_int(self.size_local_volume_table, buf)
         try:
@@ -1149,7 +1149,7 @@ class ExtraData_Unparsed(object):
 
     def bytes(self):
         buf = BytesIO()
-        write_int(len(self.data)+8, buf)
+        write_int(len(self.data) + 8, buf)
         write_int(self._signature, buf)
         buf.write(self.data)
         return buf.getvalue()
@@ -1160,7 +1160,7 @@ class ExtraData_Unparsed(object):
 
 
 def padding(val, size, byte=b'\x00'):
-    return val + (size-len(val)) * byte
+    return val + (size - len(val)) * byte
 
 
 class ExtraData_IconEnvironmentDataBlock(object):
@@ -1222,7 +1222,7 @@ class TypedPropertyValue(object):
     def set_string(self, value):
         self.type = 0x1f
         buf = BytesIO()
-        write_int(len(value)+2, buf)
+        write_int(len(value) + 2, buf)
         buf.write(value.encode('utf-16-le'))
         # terminator (included in size)
         buf.write(b'\x00\x00\x00\x00')
@@ -1298,14 +1298,14 @@ class PropertyStore:
                 break
             if self.is_strings:
                 name_size = read_int(buf)
-                reserved = read_byte(buf)
+                _ = read_byte(buf)  # reserved
                 name = buf.read(name_size).decode('utf-16-le')
-                value = TypedPropertyValue(buf.read(value_size-9))
+                value = TypedPropertyValue(buf.read(value_size - 9))
                 self.properties.append((name, value))
             else:
                 value_id = read_int(buf)
-                reserved = read_byte(buf)
-                value = TypedPropertyValue(buf.read(value_size-9))
+                _ = read_byte(buf)  # reserved
+                value = TypedPropertyValue(buf.read(value_size - 9))
                 self.properties.append((value_id, value))
 
     @property
@@ -1446,7 +1446,7 @@ class ExtraData(object):
             if size < 4:  # TerminalBlock
                 break
             signature = read_int(lnk)
-            bytes = lnk.read(size-8)
+            bytes = lnk.read(size - 8)
             # lnk.seek(-8, 1)
             block_type = EXTRA_DATA_TYPES[signature]
             if block_type in EXTRA_DATA_TYPES_CLASSES:
@@ -1473,7 +1473,7 @@ class ExtraData(object):
 
 
 class Lnk(object):
-    
+
     def __init__(self, f=None):
         self.file = None
         if type(f) == str or type(f) == str:
@@ -1505,14 +1505,14 @@ class Lnk(object):
             self._parse_lnk_file(f)
         if self.file:
             f.close()
-    
+
     def _read_hot_key(self, lnk):
         low = read_byte(lnk)
         high = read_byte(lnk)
         key = _KEYS.get(low, '')
         modifier = high and str(ModifierKeys(high)) or ''
         return modifier + key
-    
+
     def _write_hot_key(self, hot_key, lnk):
         if hot_key is None or not hot_key:
             low = high = 0
@@ -1588,7 +1588,7 @@ class Lnk(object):
         # only close the stream if it's our own
         if not is_file:
             f.close()
-    
+
     def write(self, lnk):
         lnk.write(_SIGNATURE)
         lnk.write(_GUID)
@@ -1679,7 +1679,7 @@ class Lnk(object):
         self._icon = icon
         self.link_flags.HasIconLocation = icon is not None
     icon = property(_get_icon, _set_icon)
-    
+
     def _get_window_mode(self):
         return self._show_command
 
@@ -1726,7 +1726,7 @@ class Lnk(object):
         self._link_info.local_base_path = path
         self._link_info.local = True
         self._link_info.make_path()
-    
+
     def specify_remote_location(self, network_share_name, base_name):
         self._link_info.network_share_name = network_share_name
         self._link_info.base_name = base_name
@@ -1833,7 +1833,7 @@ def from_segment_list(data, lnk_name=None):
     If lnk_name is given, the resulting lnk will be saved
     to a file with that name.
     The expected list for has the following format ("C:\\dir\\file.txt"):
-    
+
     ['c:\\',
      {'type': TYPE_FOLDER,
       'size': 0,            # optional for folders
@@ -1850,7 +1850,7 @@ def from_segment_list(data, lnk_name=None):
       'accessed': datetime.datetime(2012, 10, 12, 23, 28, 11, 8476)
      }
     ]
-    
+
     For relative paths just omit the drive entry.
     Hint: Correct dates really are not crucial for working lnks.
     """
@@ -1888,7 +1888,7 @@ def from_segment_list(data, lnk_name=None):
 
 
 def build_uwp(
-    package_family_name, target, location=None,logo44x44=None, lnk_name=None,
+    package_family_name, target, location=None, logo44x44=None, lnk_name=None,
 ) -> Lnk:
     """
     :param lnk_name:            ex.: crafted_uwp.lnk
@@ -1911,7 +1911,7 @@ def build_uwp(
             target=target,
             location=location,
             logo44x44=logo44x44,
-        )
+        ),
     ]
     lnk.shell_item_id_list.items = elements
 
