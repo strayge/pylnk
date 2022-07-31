@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO, IOBase
 from pprint import pformat
 from struct import pack, unpack
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 DEFAULT_CHARSET = 'cp1251'
 
@@ -274,7 +274,7 @@ def write_dos_datetime(val: datetime, buf: BytesIO) -> None:
 
 # ---- helpers
 
-def convert_time_to_unix(windows_time):
+def convert_time_to_unix(windows_time: int) -> datetime:
     # Windows time is specified as the number of 0.1 nanoseconds since January 1, 1601.
     # UNIX time is specified as the number of seconds since January 1, 1970.
     # There are 134774 days (or 11644473600 seconds) between these dates.
@@ -285,10 +285,12 @@ def convert_time_to_unix(windows_time):
         return datetime.now()
 
 
-def convert_time_to_windows(unix_time):
+def convert_time_to_windows(unix_time: Union[int, datetime]) -> int:
     if isinstance(unix_time, datetime):
-        unix_time = time.mktime(unix_time.timetuple())
-    return int((unix_time + 11644473600) * 10000000)
+        unix_time_int = time.mktime(unix_time.timetuple())
+    else:
+        unix_time_int = unix_time
+    return int((unix_time_int + 11644473600) * 10000000)
 
 
 class FormatException(Exception):
@@ -303,9 +305,9 @@ class InvalidKeyException(Exception):
     pass
 
 
-def guid_from_bytes(bytes):
+def guid_from_bytes(bytes: bytes) -> str:
     if len(bytes) != 16:
-        raise FormatException("This is no valid _GUID: %s" % bytes)
+        raise FormatException(f"This is no valid _GUID: {bytes!s}")
     ordered = [
         bytes[3], bytes[2], bytes[1], bytes[0],
         bytes[5], bytes[4], bytes[7], bytes[6],
@@ -315,7 +317,7 @@ def guid_from_bytes(bytes):
     return "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}" % tuple([x for x in ordered])
 
 
-def bytes_from_guid(guid):
+def bytes_from_guid(guid: str) -> bytes:
     nums = [
         guid[1:3], guid[3:5], guid[5:7], guid[7:9],
         guid[10:12], guid[12:14], guid[15:17], guid[17:19],
@@ -341,7 +343,7 @@ def assert_lnk_signature(f: BytesIO) -> None:
         raise FormatException("Cannot read this kind of .lnk file.")
 
 
-def is_lnk(f):
+def is_lnk(f: BytesIO) -> bool:
     if hasattr(f, 'name'):
         if f.name.split(os.path.extsep)[-1] == "lnk":
             assert_lnk_signature(f)
@@ -356,7 +358,7 @@ def is_lnk(f):
             return False
 
 
-def path_levels(p):
+def path_levels(p: str) -> Iterable[str]:
     dirname, base = ntpath.split(p)
     if base != '':
         for level in path_levels(dirname):
@@ -364,8 +366,8 @@ def path_levels(p):
     yield p
 
 
-def is_drive(data):
-    if type(data) not in (str, str):
+def is_drive(data: Union[str, bytes]) -> bool:
+    if not isinstance(data, str):
         return False
     p = re.compile("[a-zA-Z]:\\\\?$")
     return p.match(data) is not None
@@ -423,7 +425,7 @@ class ModifierKeys(Flags):
     def __init__(self, flags_bytes: int = 0) -> None:
         Flags.__init__(self, _MODIFIER_KEYS, flags_bytes)
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = ""
         s += self.CONTROL and "CONTROL+" or ""
         s += self.SHIFT and "SHIFT+" or ""
@@ -504,8 +506,8 @@ class DriveEntry:
         #     drive = drive.encode()
         # return b'/' + drive + b'\\' + b'\x00' * 19
 
-    def __str__(self):
-        return "<DriveEntry: %s>" % self.drive
+    def __str__(self) -> str:
+        return f"<DriveEntry: {self.drive!r}>"
 
 
 class PathSegmentEntry:
@@ -586,7 +588,7 @@ class PathSegmentEntry:
                 version_offset = read_short(buf)
 
     @classmethod
-    def create_for_path(cls, path):
+    def create_for_path(cls, path: str) -> 'PathSegmentEntry':
         entry = cls()
         entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
         try:
@@ -605,7 +607,7 @@ class PathSegmentEntry:
         entry.full_name = entry.short_name
         return entry
 
-    def _validate(self):
+    def _validate(self) -> None:
         if self.type is None:
             raise MissingInformationException("Type is missing, choose either TYPE_FOLDER or TYPE_FILE.")
         if self.file_size is None:
@@ -689,7 +691,7 @@ class PathSegmentEntry:
         write_short(offset_part2, out)
         return out.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<PathSegmentEntry: %s>" % self.full_name
 
 
@@ -721,7 +723,12 @@ class UwpSubBlock:
         'string': [0x11, 0x15, 0x05, 0x0f, 0x0c, 0x02, 0x0d, 0x13, 0x0b, 0x14, 0x0a],
     }
 
-    def __init__(self, bytes: Optional[bytes] = None, type: Optional[int] = None, value: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        bytes: Optional[bytes] = None,
+        type: Optional[int] = None,
+        value: Optional[Union[str, bytes]] = None,
+    ) -> None:
         self._data = bytes or b''
         self.type = type
         self.value = value
@@ -742,8 +749,8 @@ class UwpSubBlock:
                 string_len = read_int(buf)
                 self.value = read_cunicode(buf)
 
-    def __str__(self):
-        string = f'UwpSubBlock {self.name} ({hex(self.type)}): {self.value}'
+    def __str__(self) -> str:
+        string = f'UwpSubBlock {self.name} ({hex(self.type)}): {self.value!r}'
         return string.strip()
 
     @property
@@ -795,7 +802,7 @@ class UwpMainBlock:
             sub_block_data = buf.read(sub_block_size - 4)  # includes block_size
             self._blocks.append(UwpSubBlock(sub_block_data))
 
-    def __str__(self):
+    def __str__(self) -> str:
         string = f'<UwpMainBlock> {self.guid}:\n'
         for block in self._blocks:
             string += f'      {block}\n'
@@ -838,7 +845,7 @@ class UwpSegmentEntry:
             block_data = buf.read(block_size - 4)  # includes block_size
             self._blocks.append(UwpMainBlock(block_data))
 
-    def __str__(self):
+    def __str__(self) -> str:
         string = '<UwpSegmentEntry>:\n'
         for block in self._blocks:
             string += f'    {block}\n'
@@ -872,7 +879,14 @@ class UwpSegmentEntry:
         return result
 
     @classmethod
-    def create(cls, package_family_name, target, location=None, logo44x44=None):
+    def create(
+        cls,
+        package_family_name: str,
+        target: str,
+        location: Optional[str] = None,
+        logo44x44: Optional[str] = None,
+    ) -> 'UwpSegmentEntry':
+        print(type(package_family_name), type(target),type(location),type(logo44x44),)
         segment = cls()
 
         blocks = [
@@ -908,7 +922,7 @@ class LinkTargetIDList:
                 entry_len = read_short(buf)
             self._interpret(raw)
 
-    def _interpret(self, raw):
+    def _interpret(self, raw: Optional[List[bytes]]) -> None:
         if not raw:
             return
         elif raw[0][0] == 0x1F:
@@ -936,7 +950,7 @@ class LinkTargetIDList:
             else:
                 self.items.append(PathSegmentEntry(item))
 
-    def get_path(self):
+    def get_path(self) -> str:
         segments = []
         for item in self.items:
             if type(item) == RootEntry:
@@ -950,7 +964,7 @@ class LinkTargetIDList:
                 segments.append(item)
         return '\\'.join(segments)
 
-    def _validate(self):
+    def _validate(self) -> None:
         if not len(self.items):
             return
         if type(self.items[0]) == RootEntry and self.items[0].root == ROOT_MY_COMPUTER:
@@ -974,7 +988,7 @@ class LinkTargetIDList:
         out.write(b'\x00\x00')
         return out.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         string = '<LinkTargetIDList>:\n'
         for item in self.items:
             string += f'  {item}\n'
@@ -1015,7 +1029,7 @@ class LinkInfo:
             self.base_name = None
             self._path = None
 
-    def _parse_path_elements(self, lnk):
+    def _parse_path_elements(self, lnk: BytesIO) -> None:
         if self.remote:
             # 20 is the offset of the network share name
             lnk.seek(self.start + self.offs_network_volume_table + 20)
@@ -1033,13 +1047,13 @@ class LinkInfo:
             # TODO: unicode
         self.make_path()
 
-    def make_path(self):
+    def make_path(self) -> None:
         if self.remote:
             self._path = self.network_share_name + '\\' + self.base_name
         if self.local:
             self._path = self.local_base_path
 
-    def write(self, lnk):
+    def write(self, lnk: BytesIO) -> None:
         if self.remote is None:
             raise MissingInformationException("No location information given.")
         self.start = lnk.tell()
@@ -1059,7 +1073,7 @@ class LinkInfo:
             write_cstring(self.local_base_path, lnk, padding=False)
             write_byte(0, lnk)
 
-    def _calculate_sizes_and_offsets(self):
+    def _calculate_sizes_and_offsets(self) -> None:
         self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
         self.size = 28 + self.size_base_name
         if self.remote:
@@ -1078,7 +1092,7 @@ class LinkInfo:
             self.offs_network_volume_table = 0
             self.offs_base_name = self.offs_local_base_path + self.size_local_base_path
 
-    def _write_network_volume_table(self, buf):
+    def _write_network_volume_table(self, buf: BytesIO) -> None:
         write_int(self.size_network_volume_table, buf)
         write_int(2, buf)  # ?
         write_int(20, buf)  # size of Network Volume Table
@@ -1086,7 +1100,7 @@ class LinkInfo:
         write_int(131072, buf)  # ?
         write_cstring(self.network_share_name, buf)
 
-    def _write_local_volume_table(self, buf):
+    def _write_local_volume_table(self, buf: BytesIO) -> None:
         write_int(self.size_local_volume_table, buf)
         try:
             drive_type = _DRIVE_TYPE_IDS[self.drive_type]
@@ -1098,10 +1112,10 @@ class LinkInfo:
         write_cstring(self.volume_label, buf)
 
     @property
-    def path(self):
+    def path(self) -> str:
         return self._path
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = "File Location Info:"
         if self._path is None:
             return s + " <not specified>"
@@ -1133,7 +1147,15 @@ EXTRA_DATA_TYPES = {
 }
 
 
-class ExtraData_Unparsed:
+class ExtraData_DataBlock:
+    def __init__(self, bytes: Optional[bytes] = None, **kwargs: Any) -> None:
+        raise NotImplementedError
+
+    def bytes(self) -> bytes:
+        raise NotImplementedError
+
+
+class ExtraData_Unparsed(ExtraData_DataBlock):
     def __init__(
         self,
         bytes: Optional[bytes] = None,
@@ -1169,11 +1191,11 @@ class ExtraData_Unparsed:
         return s
 
 
-def padding(val, size, byte=b'\x00'):
+def padding(val: bytes, size: int, byte: bytes = b'\x00') -> bytes:
     return val + (size - len(val)) * byte
 
 
-class ExtraData_IconEnvironmentDataBlock:
+class ExtraData_IconEnvironmentDataBlock(ExtraData_DataBlock):
     def __init__(self, bytes: Optional[bytes] = None) -> None:
         # self._size = None
         # self._signature = None
@@ -1183,7 +1205,7 @@ class ExtraData_IconEnvironmentDataBlock:
         if bytes:
             self.read(bytes)
 
-    def read(self, bytes):
+    def read(self, bytes: bytes) -> None:
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
@@ -1203,14 +1225,14 @@ class ExtraData_IconEnvironmentDataBlock:
         buf.write(target_unicode)
         return buf.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         target_ansi = self.target_ansi.replace('\x00', '')
         target_unicode = self.target_unicode.replace('\x00', '')
         s = f'IconEnvironmentDataBlock\n TargetAnsi: {target_ansi}\n TargetUnicode: {target_unicode}'
         return s
 
 
-def guid_to_str(guid):
+def guid_to_str(guid: bytes) -> str:
     ordered = [guid[3], guid[2], guid[1], guid[0], guid[5], guid[4],
                guid[7], guid[6], guid[8], guid[9], guid[10], guid[11],
                guid[12], guid[13], guid[14], guid[15]]
@@ -1221,7 +1243,12 @@ def guid_to_str(guid):
 
 class TypedPropertyValue:
     # types: [MS-OLEPS] section 2.15
-    def __init__(self, bytes: Optional[bytes] = None, type=None, value=None) -> None:
+    def __init__(
+        self,
+        bytes: Optional[bytes] = None,
+        type=None,
+        value=None,
+    ) -> None:
         self.type = type
         self.value = value
         if bytes:
@@ -1229,7 +1256,7 @@ class TypedPropertyValue:
             padding = bytes[2:4]
             self.value = bytes[4:]
 
-    def set_string(self, value):
+    def set_string(self, value: str) -> None:
         self.type = 0x1f
         buf = BytesIO()
         write_int(len(value) + 2, buf)
@@ -1249,7 +1276,7 @@ class TypedPropertyValue:
         buf.write(self.value)
         return buf.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         value = self.value
         if self.type == 0x1F:
             size = value[:4]
@@ -1277,7 +1304,13 @@ class TypedPropertyValue:
 
 
 class PropertyStore:
-    def __init__(self, bytes: Optional[bytes] = None, properties=None, format_id=None, is_strings=False) -> None:
+    def __init__(
+        self,
+        bytes: Optional[bytes] = None,
+        properties=None,
+        format_id=None,
+        is_strings=False,
+    ) -> None:
         self.is_strings = is_strings
         self.properties = []
         self.format_id = format_id
@@ -1287,7 +1320,7 @@ class PropertyStore:
         if bytes:
             self.read(bytes)
 
-    def read(self, bytes_io):
+    def read(self, bytes_io: BytesIO) -> None:
         buf = bytes_io
         size = read_int(buf)
         assert size < len(buf.getvalue())
@@ -1351,7 +1384,7 @@ class PropertyStore:
 
         return buf.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = ' PropertyStore'
         s += '\n  FormatID: %s' % guid_to_str(self.format_id)
         for name, value in self.properties:
@@ -1359,8 +1392,12 @@ class PropertyStore:
         return s.strip()
 
 
-class ExtraData_PropertyStoreDataBlock:
-    def __init__(self, bytes: Optional[bytes] = None, stores=None) -> None:
+class ExtraData_PropertyStoreDataBlock(ExtraData_DataBlock):
+    def __init__(
+        self,
+        bytes: Optional[bytes] = None,
+        stores: Optional[List[PropertyStore]] = None,
+    ) -> None:
         self._size = None
         self._signature = 0xA0000009
         self.stores = []
@@ -1369,7 +1406,7 @@ class ExtraData_PropertyStoreDataBlock:
         if bytes:
             self.read(bytes)
 
-    def read(self, bytes):
+    def read(self, bytes: bytes) -> None:
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
@@ -1396,14 +1433,14 @@ class ExtraData_PropertyStoreDataBlock:
         write_int(0x00000000, buf)
         return buf.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = 'PropertyStoreDataBlock'
         for prop_store in self.stores:
             s += '\n %s' % str(prop_store)
         return s
 
 
-class ExtraData_EnvironmentVariableDataBlock:
+class ExtraData_EnvironmentVariableDataBlock(ExtraData_DataBlock):
     def __init__(self, bytes: Optional[bytes] = None) -> None:
         self._signature = 0xA0000001
         self.target_ansi = None
@@ -1411,7 +1448,7 @@ class ExtraData_EnvironmentVariableDataBlock:
         if bytes:
             self.read(bytes)
 
-    def read(self, bytes):
+    def read(self, bytes: bytes) -> None:
         buf = BytesIO(bytes)
         self.target_ansi = buf.read(260).decode()
         self.target_unicode = buf.read(520).decode('utf-16-le')
@@ -1429,14 +1466,14 @@ class ExtraData_EnvironmentVariableDataBlock:
         buf.write(target_unicode)
         return buf.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         target_ansi = self.target_ansi.replace('\x00', '')
         target_unicode = self.target_unicode.replace('\x00', '')
         s = f'EnvironmentVariableDataBlock\n TargetAnsi: {target_ansi}\n TargetUnicode: {target_unicode}'
         return s
 
 
-EXTRA_DATA_TYPES_CLASSES = {
+EXTRA_DATA_TYPES_CLASSES: Dict[str, Type[ExtraData_DataBlock]] = {
     'IconEnvironmentDataBlock': ExtraData_IconEnvironmentDataBlock,
     'PropertyStoreDataBlock': ExtraData_PropertyStoreDataBlock,
     'EnvironmentVariableDataBlock': ExtraData_EnvironmentVariableDataBlock,
@@ -1445,7 +1482,7 @@ EXTRA_DATA_TYPES_CLASSES = {
 
 class ExtraData:
     # EXTRA_DATA = *EXTRA_DATA_BLOCK TERMINAL_BLOCK
-    def __init__(self, lnk=None, blocks=None) -> None:
+    def __init__(self, lnk: Optional[BytesIO] = None, blocks: Optional[List[ExtraData_DataBlock]] = None) -> None:
         self.blocks = []
         if blocks:
             self.blocks = blocks
@@ -1475,7 +1512,7 @@ class ExtraData:
         result += b'\x00\x00\x00\x00'  # TerminalBlock
         return result
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = ''
         for block in self.blocks:
             s += '\n' + str(block)
@@ -1484,9 +1521,9 @@ class ExtraData:
 
 class Lnk:
 
-    def __init__(self, f=None) -> None:
+    def __init__(self, f: Optional[Union[str, BytesIO]] = None) -> None:
         self.file = None
-        if type(f) == str or type(f) == str:
+        if type(f) == str:
             self.file = f
             try:
                 f = open(self.file, 'rb')
@@ -1516,14 +1553,14 @@ class Lnk:
         if self.file:
             f.close()
 
-    def _read_hot_key(self, lnk):
+    def _read_hot_key(self, lnk: BytesIO) -> str:
         low = read_byte(lnk)
         high = read_byte(lnk)
         key = _KEYS.get(low, '')
         modifier = high and str(ModifierKeys(high)) or ''
         return modifier + key
 
-    def _write_hot_key(self, hot_key, lnk):
+    def _write_hot_key(self, hot_key: str, lnk: BytesIO) -> None:
         if hot_key is None or not hot_key:
             low = high = 0
         else:
@@ -1539,7 +1576,7 @@ class Lnk:
         write_byte(low, lnk)
         write_byte(high, lnk)
 
-    def _parse_lnk_file(self, lnk):
+    def _parse_lnk_file(self, lnk: BytesIO) -> None:
         # SHELL_LINK_HEADER [LINKTARGET_IDLIST] [LINKINFO] [STRING_DATA] *EXTRA_DATA
 
         # SHELL_LINK_HEADER
@@ -1581,7 +1618,7 @@ class Lnk:
         # *EXTRA_DATA
         self.extra_data = ExtraData(lnk)
 
-    def save(self, f: Optional[Union[str, IOBase]] = None, force_ext=False):
+    def save(self, f: Optional[Union[str, IOBase]] = None, force_ext: bool = False) -> None:
         if f is None:
             f = self.file
         if f is None:
@@ -1599,7 +1636,7 @@ class Lnk:
         if not is_file:
             f.close()
 
-    def write(self, lnk):
+    def write(self, lnk: BytesIO) -> None:
         lnk.write(_SIGNATURE)
         lnk.write(_GUID)
         write_int(self.link_flags.bytes, lnk)
@@ -1633,74 +1670,74 @@ class Lnk:
         else:
             lnk.write(b'\x00\x00\x00\x00')
 
-    def _get_shell_item_id_list(self):
+    def _get_shell_item_id_list(self) -> LinkTargetIDList:
         return self._shell_item_id_list
 
-    def _set_shell_item_id_list(self, shell_item_id_list):
+    def _set_shell_item_id_list(self, shell_item_id_list: LinkTargetIDList) -> None:
         self._shell_item_id_list = shell_item_id_list
         self.link_flags.HasLinkTargetIDList = shell_item_id_list is not None
     shell_item_id_list = property(_get_shell_item_id_list, _set_shell_item_id_list)
 
-    def _get_link_info(self):
+    def _get_link_info(self) -> LinkInfo:
         return self._link_info
 
-    def _set_link_info(self, link_info):
+    def _set_link_info(self, link_info: LinkInfo) -> None:
         self._link_info = link_info
         self.link_flags.ForceNoLinkInfo = link_info is None
         self.link_flags.HasLinkInfo = link_info is not None
     link_info = property(_get_link_info, _set_link_info)
 
-    def _get_description(self):
+    def _get_description(self) -> str:
         return self._description
 
-    def _set_description(self, description):
+    def _set_description(self, description: str) -> None:
         self._description = description
         self.link_flags.HasName = description is not None
     description = property(_get_description, _set_description)
 
-    def _get_relative_path(self):
+    def _get_relative_path(self) -> str:
         return self._relative_path
 
-    def _set_relative_path(self, relative_path):
+    def _set_relative_path(self, relative_path: str) -> None:
         self._relative_path = relative_path
         self.link_flags.HasRelativePath = relative_path is not None
     relative_path = property(_get_relative_path, _set_relative_path)
 
-    def _get_work_dir(self):
+    def _get_work_dir(self) -> str:
         return self._work_dir
 
-    def _set_work_dir(self, work_dir):
+    def _set_work_dir(self, work_dir: str) -> None:
         self._work_dir = work_dir
         self.link_flags.HasWorkingDir = work_dir is not None
     work_dir = working_dir = property(_get_work_dir, _set_work_dir)
 
-    def _get_arguments(self):
+    def _get_arguments(self) -> str:
         return self._arguments
 
-    def _set_arguments(self, arguments):
+    def _set_arguments(self, arguments: str) -> None:
         self._arguments = arguments
         self.link_flags.HasArguments = arguments is not None
     arguments = property(_get_arguments, _set_arguments)
 
-    def _get_icon(self):
+    def _get_icon(self) -> str:
         return self._icon
 
-    def _set_icon(self, icon):
+    def _set_icon(self, icon: str) -> None:
         self._icon = icon
         self.link_flags.HasIconLocation = icon is not None
     icon = property(_get_icon, _set_icon)
 
-    def _get_window_mode(self):
+    def _get_window_mode(self) -> str:
         return self._show_command
 
-    def _set_window_mode(self, value):
+    def _set_window_mode(self, value: str) -> None:
         if value not in list(_SHOW_COMMANDS.values()):
             raise ValueError("Not a valid window mode: %s. Choose any of pylnk.WINDOW_*" % value)
         self._show_command = value
     window_mode = show_command = property(_get_window_mode, _set_window_mode)
 
     @property
-    def path(self):
+    def path(self) -> str:
         # lnk can contains several different paths at different structures
         # here is some logic consistent with link properties at explorer (at least on test examples)
 
@@ -1729,7 +1766,13 @@ class Lnk:
             return env_var_path
         return id_list_path
 
-    def specify_local_location(self, path, drive_type=None, drive_serial=None, volume_label=None):
+    def specify_local_location(
+        self,
+        path: str,
+        drive_type: Optional[str] = None,
+        drive_serial: Optional[str] = None,
+        volume_label: Optional[str] = None,
+    ) -> None:
         self._link_info.drive_type = drive_type or DRIVE_UNKNOWN
         self._link_info.drive_serial = drive_serial or ''
         self._link_info.volume_label = volume_label or ''
@@ -1737,7 +1780,7 @@ class Lnk:
         self._link_info.local = True
         self._link_info.make_path()
 
-    def specify_remote_location(self, network_share_name, base_name):
+    def specify_remote_location(self, network_share_name: str, base_name: str) -> None:
         self._link_info.network_share_name = network_share_name
         self._link_info.base_name = base_name
         self._link_info.remote = True
@@ -1774,11 +1817,11 @@ class Lnk:
 
 # ---- convenience functions
 
-def parse(lnk) -> Lnk:
+def parse(lnk: str) -> Lnk:
     return Lnk(lnk)
 
 
-def create(f=None) -> Lnk:
+def create(f: Optional[BytesIO] = None) -> Lnk:
     lnk = Lnk()
     lnk.file = f
     return lnk
