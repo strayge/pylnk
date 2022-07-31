@@ -373,7 +373,7 @@ def is_drive(data):
 
 # ---- data structures
 
-class Flags(object):
+class Flags:
 
     def __init__(self, flag_names: Tuple[str, ...], flags_bytes=0):
         self._flag_names = flag_names
@@ -445,7 +445,7 @@ class ModifierKeys(Flags):
 # }
 
 
-class RootEntry(object):
+class RootEntry:
 
     def __init__(self, root):
         if root is not None:
@@ -479,7 +479,7 @@ class RootEntry(object):
         return "<RootEntry: %s>" % self.root
 
 
-class DriveEntry(object):
+class DriveEntry:
 
     def __init__(self, drive: str):
         if len(drive) == 23:
@@ -508,7 +508,7 @@ class DriveEntry(object):
         return "<DriveEntry: %s>" % self.drive
 
 
-class PathSegmentEntry(object):
+class PathSegmentEntry:
 
     def __init__(self, bytes=None):
         self.type = None
@@ -890,7 +890,7 @@ class UwpSegmentEntry:
         return segment
 
 
-class LinkTargetIDList(object):
+class LinkTargetIDList:
 
     def __init__(self, bytes=None):
         self.items = []
@@ -976,7 +976,7 @@ class LinkTargetIDList(object):
         return string.strip()
 
 
-class LinkInfo(object):
+class LinkInfo:
 
     def __init__(self, lnk=None):
         if lnk is not None:
@@ -1128,7 +1128,7 @@ EXTRA_DATA_TYPES = {
 }
 
 
-class ExtraData_Unparsed(object):
+class ExtraData_Unparsed:
     def __init__(self, bytes=None, signature=None, data=None):
         self._signature = signature
         self._size = None
@@ -1163,7 +1163,7 @@ def padding(val, size, byte=b'\x00'):
     return val + (size - len(val)) * byte
 
 
-class ExtraData_IconEnvironmentDataBlock(object):
+class ExtraData_IconEnvironmentDataBlock:
     def __init__(self, bytes=None):
         # self._size = None
         # self._signature = None
@@ -1209,7 +1209,7 @@ def guid_to_str(guid):
     return res
 
 
-class TypedPropertyValue(object):
+class TypedPropertyValue:
     # types: [MS-OLEPS] section 2.15
     def __init__(self, bytes=None, type=None, value=None):
         self.type = type
@@ -1349,7 +1349,7 @@ class PropertyStore:
         return s.strip()
 
 
-class ExtraData_PropertyStoreDataBlock(object):
+class ExtraData_PropertyStoreDataBlock:
     def __init__(self, bytes=None, stores=None):
         self._size = None
         self._signature = 0xA0000009
@@ -1393,7 +1393,7 @@ class ExtraData_PropertyStoreDataBlock(object):
         return s
 
 
-class ExtraData_EnvironmentVariableDataBlock(object):
+class ExtraData_EnvironmentVariableDataBlock:
     def __init__(self, bytes=None):
         self._signature = 0xA0000001
         self.target_ansi = None
@@ -1433,7 +1433,7 @@ EXTRA_DATA_TYPES_CLASSES = {
 }
 
 
-class ExtraData(object):
+class ExtraData:
     # EXTRA_DATA = *EXTRA_DATA_BLOCK TERMINAL_BLOCK
     def __init__(self, lnk=None, blocks=None):
         self.blocks = []
@@ -1472,7 +1472,7 @@ class ExtraData(object):
         return s
 
 
-class Lnk(object):
+class Lnk:
 
     def __init__(self, f=None):
         self.file = None
