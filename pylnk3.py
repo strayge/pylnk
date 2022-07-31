@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO, IOBase
 from pprint import pformat
 from struct import pack, unpack
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 DEFAULT_CHARSET = 'cp1251'
 
@@ -150,23 +150,23 @@ _DRIVE_PATTERN = re.compile(r'(\w)[:/\\]*$')
 # ---- read and write binary data
 
 
-def read_byte(buf):
-    return unpack('<B', buf.read(1))[0]
+def read_byte(buf: BytesIO) -> int:
+    return unpack('<B', buf.read(1))[0]  # type: ignore[no-any-return]
 
 
-def read_short(buf):
-    return unpack('<H', buf.read(2))[0]
+def read_short(buf: BytesIO) -> int:
+    return unpack('<H', buf.read(2))[0]  # type: ignore[no-any-return]
 
 
-def read_int(buf):
-    return unpack('<I', buf.read(4))[0]
+def read_int(buf: BytesIO) -> int:
+    return unpack('<I', buf.read(4))[0]  # type: ignore[no-any-return]
 
 
-def read_double(buf):
-    return unpack('<Q', buf.read(8))[0]
+def read_double(buf: BytesIO) -> int:
+    return unpack('<Q', buf.read(8))[0]  # type: ignore[no-any-return]
 
 
-def read_cunicode(buf):
+def read_cunicode(buf: BytesIO) -> str:
     s = b""
     b = buf.read(2)
     while b != b'\x00\x00':
@@ -175,7 +175,7 @@ def read_cunicode(buf):
     return s.decode('utf-16-le')
 
 
-def read_cstring(buf, padding=False):
+def read_cstring(buf: BytesIO, padding: bool = False) -> str:
     s = b""
     b = buf.read(1)
     while b != b'\x00':
@@ -187,7 +187,7 @@ def read_cstring(buf, padding=False):
     return s.decode(DEFAULT_CHARSET)
 
 
-def read_sized_string(buf, string=True):
+def read_sized_string(buf: BytesIO, string: bool = True) -> Union[str, bytes]:
     size = read_short(buf)
     if string:
         return buf.read(size * 2).decode('utf-16-le')
@@ -195,7 +195,7 @@ def read_sized_string(buf, string=True):
         return buf.read(size)
 
 
-def get_bits(value, start, count, length=16):
+def get_bits(value: int, start: int, count: int, length: int = 16) -> int:
     mask = 0
     for i in range(count):
         mask = mask | 1 << i
@@ -203,7 +203,7 @@ def get_bits(value, start, count, length=16):
     return value >> shift & mask
 
 
-def read_dos_datetime(buf):
+def read_dos_datetime(buf: BytesIO) -> datetime:
     date = read_short(buf)
     time = read_short(buf)
     year = get_bits(date, 0, 7) + 1980
@@ -218,36 +218,36 @@ def read_dos_datetime(buf):
     return datetime(year, month, day, hour, minute, second)
 
 
-def write_byte(val, buf):
+def write_byte(val: int, buf: BytesIO) -> None:
     buf.write(pack('<B', val))
 
 
-def write_short(val, buf):
+def write_short(val: int, buf: BytesIO) -> None:
     buf.write(pack('<H', val))
 
 
-def write_int(val, buf):
+def write_int(val: int, buf: BytesIO) -> None:
     buf.write(pack('<I', val))
 
 
-def write_double(val, buf):
+def write_double(val: int, buf: BytesIO) -> None:
     buf.write(pack('<Q', val))
 
 
-def write_cstring(val, buf, padding=False):
+def write_cstring(val: str, buf: BytesIO, padding: bool = False) -> None:
     # val = val.encode('unicode-escape').replace('\\\\', '\\')
-    val = val.encode(DEFAULT_CHARSET)
-    buf.write(val + b'\x00')
-    if padding and not len(val) % 2:
+    val_bytes = val.encode(DEFAULT_CHARSET)
+    buf.write(val_bytes + b'\x00')
+    if padding and not len(val_bytes) % 2:
         buf.write(b'\x00')
 
 
-def write_cunicode(val, buf):
+def write_cunicode(val: str, buf: BytesIO) -> None:
     uni = val.encode('utf-16-le')
     buf.write(uni + b'\x00\x00')
 
 
-def write_sized_string(val, buf, string=True):
+def write_sized_string(val: str, buf: BytesIO, string: bool = True) -> None:
     size = len(val)
     write_short(size, buf)
     if string:
@@ -256,11 +256,11 @@ def write_sized_string(val, buf, string=True):
         buf.write(val.encode())
 
 
-def put_bits(bits, target, start, count, length=16):
+def put_bits(bits: int, target: int, start: int, count: int, length: int = 16) -> int:
     return target | bits << (length - start - count)
 
 
-def write_dos_datetime(val, buf):
+def write_dos_datetime(val: datetime, buf: BytesIO) -> None:
     date = time = 0
     date = put_bits(val.year - 1980, date, 0, 7)
     date = put_bits(val.month, date, 7, 4)
@@ -331,7 +331,7 @@ def bytes_from_guid(guid):
     return bytes([int(x, 16) for x in ordered_nums])
 
 
-def assert_lnk_signature(f):
+def assert_lnk_signature(f: BytesIO) -> None:
     f.seek(0)
     sig = f.read(4)
     guid = f.read(16)
@@ -375,38 +375,38 @@ def is_drive(data):
 
 class Flags:
 
-    def __init__(self, flag_names: Tuple[str, ...], flags_bytes=0):
+    def __init__(self, flag_names: Tuple[str, ...], flags_bytes: int = 0) -> None:
         self._flag_names = flag_names
         self._flags: Dict[str, bool] = dict([(name, False) for name in flag_names])
         self.set_flags(flags_bytes)
 
-    def set_flags(self, flags_bytes):
+    def set_flags(self, flags_bytes: int) -> None:
         for pos, flag_name in enumerate(self._flag_names):
             self._flags[flag_name] = bool(flags_bytes >> pos & 0x1)
 
     @property
-    def bytes(self):
-        bytes = 0
+    def bytes(self) -> int:
+        result = 0
         for pos in range(len(self._flag_names)):
-            bytes = (self._flags[self._flag_names[pos]] and 1 or 0) << pos | bytes
-        return bytes
+            result = (self._flags[self._flag_names[pos]] and 1 or 0) << pos | result
+        return result
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         if key in self._flags:
             return object.__getattribute__(self, '_flags')[key]
         return object.__getattribute__(self, key)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: bool) -> None:
         if key not in self._flags:
             raise KeyError("The key '%s' is not defined for those flags." % key)
         self._flags[key] = value
 
-    def __getattr__(self, key):
+    def __getattr__(self, key: str) -> Any:
         if key in self._flags:
             return object.__getattribute__(self, '_flags')[key]
         return object.__getattribute__(self, key)
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: Any) -> None:
         if '_flags' not in self.__dict__:
             object.__setattr__(self, key, value)
         elif key in self.__dict__:
@@ -414,13 +414,13 @@ class Flags:
         else:
             self.__setitem__(key, value)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return pformat(self._flags, indent=2)
 
 
 class ModifierKeys(Flags):
 
-    def __init__(self, flags_bytes=0):
+    def __init__(self, flags_bytes: int = 0) -> None:
         Flags.__init__(self, _MODIFIER_KEYS, flags_bytes)
 
     def __str__(self):
@@ -447,25 +447,25 @@ class ModifierKeys(Flags):
 
 class RootEntry:
 
-    def __init__(self, root):
+    def __init__(self, root: Union[str, bytes]) -> None:
         if root is not None:
             # create from text representation
-            if root in list(_ROOT_LOCATION_GUIDS.keys()):
+            if isinstance(root, str):
                 self.root = root
-                self.guid = _ROOT_LOCATION_GUIDS[root]
+                self.guid: str = _ROOT_LOCATION_GUIDS[root]
                 return
-
-            # from binary
-            root_type = root[0]
-            index = root[1]
-            guid_bytes = root[2:18]
-            self.guid = guid_from_bytes(guid_bytes)
-            self.root = _ROOT_LOCATIONS.get(self.guid, f"UNKNOWN {self.guid}")
-            # if self.root == "UNKNOWN":
-            #     self.root = _ROOT_INDEX.get(index, "UNKNOWN")
+            else:
+                # from binary
+                root_type = root[0]
+                index = root[1]
+                guid_bytes = root[2:18]
+                self.guid = guid_from_bytes(guid_bytes)
+                self.root = _ROOT_LOCATIONS.get(self.guid, f"UNKNOWN {self.guid}")
+                # if self.root == "UNKNOWN":
+                #     self.root = _ROOT_INDEX.get(index, "UNKNOWN")
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         guid = self.guid[1:-1].replace('-', '')
         chars = [bytes([int(x, 16)]) for x in [guid[i:i + 2] for i in range(0, 32, 2)]]
         return (
@@ -475,13 +475,13 @@ class RootEntry:
             + b''.join(chars[8:])
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<RootEntry: %s>" % self.root
 
 
 class DriveEntry:
 
-    def __init__(self, drive: str):
+    def __init__(self, drive: bytes) -> None:
         if len(drive) == 23:
             # binary data from parsed lnk
             self.drive = drive[1:3]
@@ -495,7 +495,7 @@ class DriveEntry:
                 raise FormatException("This is not a valid drive: " + str(drive))
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         drive = self.drive
         padded_str = drive + b'\\' + b'\x00' * 19
         return b'\x2F' + padded_str
@@ -510,7 +510,7 @@ class DriveEntry:
 
 class PathSegmentEntry:
 
-    def __init__(self, bytes=None):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
         self.type = None
         self.file_size = None
         self.modified = None
@@ -627,9 +627,9 @@ class PathSegmentEntry:
             self.short_name = self.full_name
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         if self.full_name is None:
-            return
+            return b''
         self._validate()
         out = BytesIO()
         entry_type = self.type
@@ -721,7 +721,7 @@ class UwpSubBlock:
         'string': [0x11, 0x15, 0x05, 0x0f, 0x0c, 0x02, 0x0d, 0x13, 0x0b, 0x14, 0x0a],
     }
 
-    def __init__(self, bytes=None, type=None, value=None):
+    def __init__(self, bytes: Optional[bytes] = None, type: Optional[int] = None, value: Optional[str] = None) -> None:
         self._data = bytes or b''
         self.type = type
         self.value = value
@@ -747,7 +747,7 @@ class UwpSubBlock:
         return string.strip()
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         out = BytesIO()
         if self.value:
             if isinstance(self.value, str):
@@ -773,7 +773,12 @@ class UwpSubBlock:
 class UwpMainBlock:
     magic = b'\x31\x53\x50\x53'
 
-    def __init__(self, bytes=None, guid: Optional[str] = None, blocks=None):
+    def __init__(
+        self,
+        bytes: Optional[bytes] = None,
+        guid: Optional[str] = None,
+        blocks: Optional[List[UwpSubBlock]] = None,
+    ) -> None:
         self._data = bytes or b''
         self._blocks = blocks or []
         self.guid: str = guid
@@ -797,7 +802,7 @@ class UwpMainBlock:
         return string.strip()
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         blocks_bytes = [block.bytes for block in self._blocks]
         out = BytesIO()
         out.write(self.magic)
@@ -814,7 +819,7 @@ class UwpSegmentEntry:
     magic = b'APPS'
     header = b'\x08\x00\x03\x00\x00\x00\x00\x00\x00\x00'
 
-    def __init__(self, bytes=None):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
         self._blocks = []
         self._data = bytes
         if bytes is None:
@@ -840,7 +845,7 @@ class UwpSegmentEntry:
         return string.strip()
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         blocks_bytes = [block.bytes for block in self._blocks]
         blocks_size = sum([len(block) + 4 for block in blocks_bytes]) + 4   # with terminator
         size = (
@@ -892,7 +897,7 @@ class UwpSegmentEntry:
 
 class LinkTargetIDList:
 
-    def __init__(self, bytes=None):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
         self.items = []
         if bytes is not None:
             buf = BytesIO(bytes)
@@ -956,7 +961,7 @@ class LinkTargetIDList:
             raise ValueError("A drive is required for absolute lnks")
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         self._validate()
         out = BytesIO()
         for item in self.items:
@@ -978,7 +983,7 @@ class LinkTargetIDList:
 
 class LinkInfo:
 
-    def __init__(self, lnk=None):
+    def __init__(self, lnk: Optional[BytesIO] = None) -> None:
         if lnk is not None:
             self.start = lnk.tell()
             self.size = read_int(lnk)
@@ -994,7 +999,7 @@ class LinkInfo:
                 print("TODO: read the unicode stuff")  # TODO: read the unicode stuff
             self._parse_path_elements(lnk)
         else:
-            self.size = None
+            self.size = 0
             self.header_size = _LINK_INFO_HEADER_DEFAULT
             self.local = 0
             self.remote = 0
@@ -1129,7 +1134,12 @@ EXTRA_DATA_TYPES = {
 
 
 class ExtraData_Unparsed:
-    def __init__(self, bytes=None, signature=None, data=None):
+    def __init__(
+        self,
+        bytes: Optional[bytes] = None,
+        signature: Optional[int] = None,
+        data: Optional[bytes] = None,
+    ) -> None:
         self._signature = signature
         self._size = None
         self.data = data
@@ -1147,14 +1157,14 @@ class ExtraData_Unparsed:
     #     # self._signature = read_int(buf)
     #     self.data = buf.read(self._size - 8)
 
-    def bytes(self):
+    def bytes(self) -> bytes:
         buf = BytesIO()
         write_int(len(self.data) + 8, buf)
         write_int(self._signature, buf)
         buf.write(self.data)
         return buf.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = 'ExtraDataBlock\n signature %s\n data: %s' % (hex(self._signature), self.data)
         return s
 
@@ -1164,7 +1174,7 @@ def padding(val, size, byte=b'\x00'):
 
 
 class ExtraData_IconEnvironmentDataBlock:
-    def __init__(self, bytes=None):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
         # self._size = None
         # self._signature = None
         self._signature = 0xA0000007
@@ -1180,7 +1190,7 @@ class ExtraData_IconEnvironmentDataBlock:
         self.target_ansi = buf.read(260).decode('ansi')
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
-    def bytes(self):
+    def bytes(self) -> bytes:
         target_ansi = padding(self.target_ansi.encode(), 260)
         target_unicode = padding(self.target_unicode.encode('utf-16-le'), 520)
         size = 8 + len(target_ansi) + len(target_unicode)
@@ -1211,7 +1221,7 @@ def guid_to_str(guid):
 
 class TypedPropertyValue:
     # types: [MS-OLEPS] section 2.15
-    def __init__(self, bytes=None, type=None, value=None):
+    def __init__(self, bytes: Optional[bytes] = None, type=None, value=None) -> None:
         self.type = type
         self.value = value
         if bytes:
@@ -1232,7 +1242,7 @@ class TypedPropertyValue:
         self.value = buf.getvalue()
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         buf = BytesIO()
         write_short(self.type, buf)
         write_short(0x0000, buf)
@@ -1267,7 +1277,7 @@ class TypedPropertyValue:
 
 
 class PropertyStore:
-    def __init__(self, bytes=None, properties=None, format_id=None, is_strings=False):
+    def __init__(self, bytes: Optional[bytes] = None, properties=None, format_id=None, is_strings=False) -> None:
         self.is_strings = is_strings
         self.properties = []
         self.format_id = format_id
@@ -1309,7 +1319,7 @@ class PropertyStore:
                 self.properties.append((value_id, value))
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         size = 8 + len(self.format_id)
         properties = BytesIO()
         for name, value in self.properties:
@@ -1350,7 +1360,7 @@ class PropertyStore:
 
 
 class ExtraData_PropertyStoreDataBlock:
-    def __init__(self, bytes=None, stores=None):
+    def __init__(self, bytes: Optional[bytes] = None, stores=None) -> None:
         self._size = None
         self._signature = 0xA0000009
         self.stores = []
@@ -1370,7 +1380,7 @@ class ExtraData_PropertyStoreDataBlock:
                 break
             self.stores.append(prop_store)
 
-    def bytes(self):
+    def bytes(self) -> bytes:
         stores = b''
         for prop_store in self.stores:
             stores += prop_store.bytes
@@ -1394,7 +1404,7 @@ class ExtraData_PropertyStoreDataBlock:
 
 
 class ExtraData_EnvironmentVariableDataBlock:
-    def __init__(self, bytes=None):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
         self._signature = 0xA0000001
         self.target_ansi = None
         self.target_unicode = None
@@ -1406,7 +1416,7 @@ class ExtraData_EnvironmentVariableDataBlock:
         self.target_ansi = buf.read(260).decode()
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
-    def bytes(self):
+    def bytes(self) -> bytes:
         target_ansi = padding(self.target_ansi.encode(), 260)
         target_unicode = padding(self.target_unicode.encode('utf-16-le'), 520)
         size = 8 + len(target_ansi) + len(target_unicode)
@@ -1435,7 +1445,7 @@ EXTRA_DATA_TYPES_CLASSES = {
 
 class ExtraData:
     # EXTRA_DATA = *EXTRA_DATA_BLOCK TERMINAL_BLOCK
-    def __init__(self, lnk=None, blocks=None):
+    def __init__(self, lnk=None, blocks=None) -> None:
         self.blocks = []
         if blocks:
             self.blocks = blocks
@@ -1458,7 +1468,7 @@ class ExtraData:
             self.blocks.append(block)
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         result = b''
         for block in self.blocks:
             result += block.bytes()
@@ -1474,7 +1484,7 @@ class ExtraData:
 
 class Lnk:
 
-    def __init__(self, f=None):
+    def __init__(self, f=None) -> None:
         self.file = None
         if type(f) == str or type(f) == str:
             self.file = f
@@ -1733,7 +1743,7 @@ class Lnk:
         self._link_info.remote = True
         self._link_info.make_path()
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = "Target file:\n"
         s += str(self.file_flags)
         s += "\nCreation Time: %s" % self.creation_time
@@ -1764,20 +1774,26 @@ class Lnk:
 
 # ---- convenience functions
 
-def parse(lnk):
+def parse(lnk) -> Lnk:
     return Lnk(lnk)
 
 
-def create(f=None):
+def create(f=None) -> Lnk:
     lnk = Lnk()
     lnk.file = f
     return lnk
 
 
 def for_file(
-    target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0,
-    work_dir=None, window_mode=None,
-):
+    target_file: str,
+    lnk_name: Optional[str] = None,
+    arguments=None,
+    description: Optional[str] = None,
+    icon_file: Optional[str] = None,
+    icon_index: int = 0,
+    work_dir: Optional[str] = None,
+    window_mode=None,
+) -> Lnk:
     lnk = create(lnk_name)
     lnk.link_flags.IsUnicode = True
     lnk.link_info = None
@@ -1827,7 +1843,7 @@ def for_file(
     return lnk
 
 
-def from_segment_list(data, lnk_name=None):
+def from_segment_list(data: Union[List, Tuple], lnk_name: Optional[str] = None) -> Lnk:
     """
     Creates a lnk file from a list of path segments.
     If lnk_name is given, the resulting lnk will be saved
@@ -1888,7 +1904,11 @@ def from_segment_list(data, lnk_name=None):
 
 
 def build_uwp(
-    package_family_name, target, location=None, logo44x44=None, lnk_name=None,
+    package_family_name: str,
+    target: str,
+    location: Optional[str] = None,
+    logo44x44: Optional[str] = None,
+    lnk_name: Optional[str] = None,
 ) -> Lnk:
     """
     :param lnk_name:            ex.: crafted_uwp.lnk
@@ -1921,14 +1941,14 @@ def build_uwp(
     return lnk
 
 
-def get_prop(obj, prop_queue):
+def get_prop(obj: Any, prop_queue: List[str]) -> Any:
     attr = getattr(obj, prop_queue[0])
     if len(prop_queue) > 1:
         return get_prop(attr, prop_queue[1:])
     return attr
 
 
-def cli():
+def cli() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     subparsers = parser.add_subparsers(dest='action', metavar='{p, c, d}')
     parser.add_argument('--help', '-h', action='store_true')
