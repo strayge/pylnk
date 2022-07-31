@@ -11,7 +11,7 @@ import os
 import re
 import time
 from datetime import datetime
-from io import BytesIO, IOBase
+from io import BufferedReader, BytesIO, IOBase
 from pprint import pformat
 from struct import pack, unpack
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
@@ -366,7 +366,7 @@ def path_levels(p: str) -> Iterable[str]:
     yield p
 
 
-def is_drive(data: Union[str, bytes]) -> bool:
+def is_drive(data: Union[str, Any]) -> bool:
     if not isinstance(data, str):
         return False
     p = re.compile("[a-zA-Z]:\\\\?$")
@@ -446,8 +446,11 @@ class ModifierKeys(Flags):
 #     0x80: 'MY_GAMES',
 # }
 
+class IDListEntry:
+    ...
 
-class RootEntry:
+
+class RootEntry(IDListEntry):
 
     def __init__(self, root: Union[str, bytes]) -> None:
         if root is not None:
@@ -481,7 +484,7 @@ class RootEntry:
         return "<RootEntry: %s>" % self.root
 
 
-class DriveEntry:
+class DriveEntry(IDListEntry):
 
     def __init__(self, drive: bytes) -> None:
         if len(drive) == 23:
@@ -510,7 +513,7 @@ class DriveEntry:
         return f"<DriveEntry: {self.drive!r}>"
 
 
-class PathSegmentEntry:
+class PathSegmentEntry(IDListEntry):
 
     def __init__(self, bytes: Optional[bytes] = None) -> None:
         self.type = None
@@ -822,7 +825,7 @@ class UwpMainBlock:
         return result
 
 
-class UwpSegmentEntry:
+class UwpSegmentEntry(IDListEntry):
     magic = b'APPS'
     header = b'\x08\x00\x03\x00\x00\x00\x00\x00\x00\x00'
 
@@ -912,7 +915,7 @@ class UwpSegmentEntry:
 class LinkTargetIDList:
 
     def __init__(self, bytes: Optional[bytes] = None) -> None:
-        self.items = []
+        self.items: List[IDListEntry] = []
         if bytes is not None:
             buf = BytesIO(bytes)
             raw = []
@@ -1021,13 +1024,13 @@ class LinkInfo:
             self.offs_local_base_path = 0
             self.offs_network_volume_table = 0
             self.offs_base_name = 0
-            self.drive_type = None
-            self.drive_serial = None
-            self.volume_label = None
-            self.local_base_path = None
-            self.network_share_name = None
-            self.base_name = None
-            self._path = None
+            self.drive_type: Optional[str] = None
+            self.drive_serial: int = None  # type: ignore[assignment]
+            self.volume_label: str = None  # type: ignore[assignment]
+            self.local_base_path: str = None  # type: ignore[assignment]
+            self.network_share_name: str = ''
+            self.base_name: str = ''
+            self._path: str = ''
 
     def _parse_path_elements(self, lnk: BytesIO) -> None:
         if self.remote:
@@ -1187,7 +1190,7 @@ class ExtraData_Unparsed(ExtraData_DataBlock):
         return buf.getvalue()
 
     def __str__(self) -> str:
-        s = 'ExtraDataBlock\n signature %s\n data: %s' % (hex(self._signature), self.data)
+        s = f'ExtraDataBlock\n signature {hex(self._signature)}\n data: {self.data!r}'
         return s
 
 
@@ -1200,8 +1203,8 @@ class ExtraData_IconEnvironmentDataBlock(ExtraData_DataBlock):
         # self._size = None
         # self._signature = None
         self._signature = 0xA0000007
-        self.target_ansi = None
-        self.target_unicode = None
+        self.target_ansi: str = None  # type: ignore[assignment]
+        self.target_unicode: str = None  # type: ignore[assignment]
         if bytes:
             self.read(bytes)
 
@@ -1245,16 +1248,16 @@ class TypedPropertyValue:
     # types: [MS-OLEPS] section 2.15
     def __init__(
         self,
-        bytes: Optional[bytes] = None,
-        type=None,
-        value=None,
+        bytes_: Optional[bytes] = None,
+        type_: Optional[int] = None,
+        value: Optional[bytes] = None,
     ) -> None:
-        self.type = type
-        self.value = value
-        if bytes:
-            self.type = read_short(BytesIO(bytes))
-            padding = bytes[2:4]
-            self.value = bytes[4:]
+        self.type: int = type_
+        self.value: bytes = value or b''
+        if bytes_:
+            self.type = read_short(BytesIO(bytes_))
+            padding = bytes_[2:4]
+            self.value = bytes_[4:]
 
     def set_string(self, value: str) -> None:
         self.type = 0x1f
@@ -1300,16 +1303,16 @@ class TypedPropertyValue:
             high = read_int(stream)
             num = (high << 32) + low
             value = convert_time_to_unix(num)
-        return '%s: %s' % (hex(self.type), value)
+        return f'{hex(self.type)}: {value!s}'
 
 
 class PropertyStore:
     def __init__(
         self,
-        bytes: Optional[bytes] = None,
-        properties=None,
-        format_id=None,
-        is_strings=False,
+        bytes: Optional[BytesIO] = None,
+        properties: Optional[List[Tuple[Union[str, int], TypedPropertyValue]]] = None,
+        format_id: Optional[bytes] = None,
+        is_strings: bool = False,
     ) -> None:
         self.is_strings = is_strings
         self.properties = []
@@ -1443,8 +1446,8 @@ class ExtraData_PropertyStoreDataBlock(ExtraData_DataBlock):
 class ExtraData_EnvironmentVariableDataBlock(ExtraData_DataBlock):
     def __init__(self, bytes: Optional[bytes] = None) -> None:
         self._signature = 0xA0000001
-        self.target_ansi = None
-        self.target_unicode = None
+        self.target_ansi = ''
+        self.target_unicode = ''
         if bytes:
             self.read(bytes)
 
@@ -1521,9 +1524,9 @@ class ExtraData:
 
 class Lnk:
 
-    def __init__(self, f: Optional[Union[str, BytesIO]] = None) -> None:
-        self.file = None
-        if type(f) == str:
+    def __init__(self, f: Optional[Union[str, BufferedReader]] = None) -> None:
+        self.file: Optional[str] = None
+        if isinstance(f, str):
             self.file = f
             try:
                 f = open(self.file, 'rb')
@@ -1546,7 +1549,7 @@ class Lnk:
         self.work_dir = None
         self.arguments = None
         self.icon = None
-        self.extra_data = None
+        self.extra_data: Optional[ExtraData] = None
         if f is not None:
             assert_lnk_signature(f)
             self._parse_lnk_file(f)
@@ -1764,7 +1767,7 @@ class Lnk:
         if env_var_path:
             # some links in Recent folder contains path only at ExtraData_EnvironmentVariableDataBlock
             return env_var_path
-        return id_list_path
+        return str(id_list_path)
 
     def specify_local_location(
         self,
@@ -1821,7 +1824,7 @@ def parse(lnk: str) -> Lnk:
     return Lnk(lnk)
 
 
-def create(f: Optional[BytesIO] = None) -> Lnk:
+def create(f: Optional[str] = None) -> Lnk:
     lnk = Lnk()
     lnk.file = f
     return lnk
@@ -1830,12 +1833,12 @@ def create(f: Optional[BytesIO] = None) -> Lnk:
 def for_file(
     target_file: str,
     lnk_name: Optional[str] = None,
-    arguments=None,
+    arguments: Optional[str] = None,
     description: Optional[str] = None,
     icon_file: Optional[str] = None,
     icon_index: int = 0,
     work_dir: Optional[str] = None,
-    window_mode=None,
+    window_mode: Optional[str] = None,
 ) -> Lnk:
     lnk = create(lnk_name)
     lnk.link_flags.IsUnicode = True
@@ -1886,7 +1889,10 @@ def for_file(
     return lnk
 
 
-def from_segment_list(data: Union[List, Tuple], lnk_name: Optional[str] = None) -> Lnk:
+def from_segment_list(
+    data: List[Union[str, Dict[str, Any]]],
+    lnk_name: Optional[str] = None,
+) -> Lnk:
     """
     Creates a lnk file from a list of path segments.
     If lnk_name is given, the resulting lnk will be saved
@@ -1913,18 +1919,21 @@ def from_segment_list(data: Union[List, Tuple], lnk_name: Optional[str] = None) 
     For relative paths just omit the drive entry.
     Hint: Correct dates really are not crucial for working lnks.
     """
-    if type(data) not in (list, tuple):
+    if not isinstance(data, (list, tuple)):
         raise ValueError("Invalid data format, list or tuple expected")
     lnk = Lnk()
-    entries = []
+    entries: List[IDListEntry] = []
     if is_drive(data[0]):
+        assert isinstance(data[0], str)
         # this is an absolute link
         entries.append(RootEntry(ROOT_MY_COMPUTER))
         if not data[0].endswith('\\'):
             data[0] += "\\"
-        drive = data.pop(0).encode("ascii")
+        drive = data[0].encode("ascii")
+        data.pop(0)
         entries.append(DriveEntry(drive))
     for level in data:
+        assert isinstance(level, dict)
         segment = PathSegmentEntry()
         segment.type = level['type']
         if level['type'] == TYPE_FOLDER:
