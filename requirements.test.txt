@@ -1,6 +1,6 @@
-pytest
 pytest-cov
-flake8
-flake8-cov
+pytest
 flake8-isort
+flake8-commas
+flake8
 mypy
