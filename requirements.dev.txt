@@ -1,5 +1,8 @@
 pytest
 pytest-cov
+flake8
+flake8-cov
+flake8-isort
 mypy
 invoke
 twine
