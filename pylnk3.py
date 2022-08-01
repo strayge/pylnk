@@ -889,7 +889,6 @@ class UwpSegmentEntry(IDListEntry):
         location: Optional[str] = None,
         logo44x44: Optional[str] = None,
     ) -> 'UwpSegmentEntry':
-        print(type(package_family_name), type(target),type(location),type(logo44x44),)
         segment = cls()
 
         blocks = [
