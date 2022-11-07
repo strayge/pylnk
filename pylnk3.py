@@ -586,9 +586,18 @@ class PathSegmentEntry(object):
                 version_offset = read_short(buf)
 
     @classmethod
-    def create_for_path(cls, path):
+    def create_for_path(cls, path, final=False):
         entry = cls()
-        entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
+        try:
+            os.stat(path) # Check if the file exists
+            entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
+        except FileNotFoundError:
+            if final:
+                entry.type = TYPE_FILE
+            else:
+                entry.type = TYPE_FOLDER
+        except:
+            raise
         try:
             st = os.stat(path)
             entry.file_size = st.st_size
@@ -1776,7 +1785,7 @@ def create(f=None):
 
 def for_file(
     target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0,
-    work_dir=None, window_mode=None,
+    work_dir=None, window_mode=None, imaginary=False
 ):
     lnk = create(lnk_name)
     lnk.link_flags.IsUnicode = True
@@ -1801,8 +1810,11 @@ def for_file(
         levels = list(path_levels(target_file))
         elements = [RootEntry(ROOT_MY_COMPUTER),
                     DriveEntry(levels[0])]
-        for level in levels[1:]:
-            segment = PathSegmentEntry.create_for_path(level)
+        for i, level in enumerate(levels[1:]):
+            final = False
+            if i == len(levels[1:])-1 and imaginary:
+                final = True
+            segment = PathSegmentEntry.create_for_path(level, final)
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
@@ -1946,6 +1958,7 @@ def cli():
     parser_create.add_argument('--icon-index', '-ii', type=int, default=0, nargs='?', help='icon index')
     parser_create.add_argument('--workdir', '-w', nargs='?', help='working directory')
     parser_create.add_argument('--mode', '-m', nargs='?', choices=['Maximized', 'Normal', 'Minimized'], help='window mode')
+    parser_create.add_argument('--imaginary', '-y', action='store_true', help="The target is a file (not a folder) that doesn't exist on this system")
 
     parser_dup = subparsers.add_parser('duplicate', aliases=['d'], help='read and write lnk file')
     parser_dup.add_argument('filename', help='lnk filename to read')
@@ -1973,7 +1986,7 @@ for more info use help for each action (ex.: "pylnk3 create -h")
             args.target, args.name, arguments=args.arguments,
             description=args.description, icon_file=args.icon,
             icon_index=args.icon_index, work_dir=args.workdir,
-            window_mode=args.mode,
+            window_mode=args.mode, imaginary=args.imaginary,
         )
     elif args.action in ['parse', 'p']:
         lnk = parse(args.filename)
