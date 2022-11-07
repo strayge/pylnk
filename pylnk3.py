@@ -586,9 +586,13 @@ class PathSegmentEntry(object):
                 version_offset = read_short(buf)
 
     @classmethod
-    def create_for_path(cls, path):
+    def create_for_path(cls, path, final):
         entry = cls()
-        entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
+        # entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
+        if final:
+            entry.type = TYPE_FILE
+        else:
+            entry.type = TYPE_FOLDER
         try:
             st = os.stat(path)
             entry.file_size = st.st_size
@@ -1776,7 +1780,7 @@ def create(f=None):
 
 def for_file(
     target_file, lnk_name=None, arguments=None, description=None, icon_file=None, icon_index=0,
-    work_dir=None, window_mode=None,
+    work_dir=None, window_mode=None, is_file=True
 ):
     lnk = create(lnk_name)
     lnk.link_flags.IsUnicode = True
@@ -1801,8 +1805,11 @@ def for_file(
         levels = list(path_levels(target_file))
         elements = [RootEntry(ROOT_MY_COMPUTER),
                     DriveEntry(levels[0])]
-        for level in levels[1:]:
-            segment = PathSegmentEntry.create_for_path(level)
+        for i, level in enumerate(levels[1:]):
+            final = False
+            if i == len(levels[1:])-1 and is_file:
+                final = True
+            segment = PathSegmentEntry.create_for_path(level, final)
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
