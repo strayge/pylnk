@@ -10,8 +10,9 @@ import ntpath
 import os
 import re
 import time
+from abc import abstractmethod
 from datetime import datetime
-from io import BufferedReader, BytesIO, IOBase
+from io import BufferedIOBase, BytesIO
 from pprint import pformat
 from struct import pack, unpack
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
@@ -150,23 +151,23 @@ _DRIVE_PATTERN = re.compile(r'(\w)[:/\\]*$')
 # ---- read and write binary data
 
 
-def read_byte(buf: BytesIO) -> int:
+def read_byte(buf: BufferedIOBase) -> int:
     return unpack('<B', buf.read(1))[0]  # type: ignore[no-any-return]
 
 
-def read_short(buf: BytesIO) -> int:
+def read_short(buf: BufferedIOBase) -> int:
     return unpack('<H', buf.read(2))[0]  # type: ignore[no-any-return]
 
 
-def read_int(buf: BytesIO) -> int:
+def read_int(buf: BufferedIOBase) -> int:
     return unpack('<I', buf.read(4))[0]  # type: ignore[no-any-return]
 
 
-def read_double(buf: BytesIO) -> int:
+def read_double(buf: BufferedIOBase) -> int:
     return unpack('<Q', buf.read(8))[0]  # type: ignore[no-any-return]
 
 
-def read_cunicode(buf: BytesIO) -> str:
+def read_cunicode(buf: BufferedIOBase) -> str:
     s = b""
     b = buf.read(2)
     while b != b'\x00\x00':
@@ -175,7 +176,7 @@ def read_cunicode(buf: BytesIO) -> str:
     return s.decode('utf-16-le')
 
 
-def read_cstring(buf: BytesIO, padding: bool = False) -> str:
+def read_cstring(buf: BufferedIOBase, padding: bool = False) -> str:
     s = b""
     b = buf.read(1)
     while b != b'\x00':
@@ -187,7 +188,7 @@ def read_cstring(buf: BytesIO, padding: bool = False) -> str:
     return s.decode(DEFAULT_CHARSET)
 
 
-def read_sized_string(buf: BytesIO, string: bool = True) -> Union[str, bytes]:
+def read_sized_string(buf: BufferedIOBase, string: bool = True) -> Union[str, bytes]:
     size = read_short(buf)
     if string:
         return buf.read(size * 2).decode('utf-16-le')
@@ -203,7 +204,7 @@ def get_bits(value: int, start: int, count: int, length: int = 16) -> int:
     return value >> shift & mask
 
 
-def read_dos_datetime(buf: BytesIO) -> datetime:
+def read_dos_datetime(buf: BufferedIOBase) -> datetime:
     date = read_short(buf)
     time = read_short(buf)
     year = get_bits(date, 0, 7) + 1980
@@ -218,23 +219,23 @@ def read_dos_datetime(buf: BytesIO) -> datetime:
     return datetime(year, month, day, hour, minute, second)
 
 
-def write_byte(val: int, buf: BytesIO) -> None:
+def write_byte(val: int, buf: BufferedIOBase) -> None:
     buf.write(pack('<B', val))
 
 
-def write_short(val: int, buf: BytesIO) -> None:
+def write_short(val: int, buf: BufferedIOBase) -> None:
     buf.write(pack('<H', val))
 
 
-def write_int(val: int, buf: BytesIO) -> None:
+def write_int(val: int, buf: BufferedIOBase) -> None:
     buf.write(pack('<I', val))
 
 
-def write_double(val: int, buf: BytesIO) -> None:
+def write_double(val: int, buf: BufferedIOBase) -> None:
     buf.write(pack('<Q', val))
 
 
-def write_cstring(val: str, buf: BytesIO, padding: bool = False) -> None:
+def write_cstring(val: str, buf: BufferedIOBase, padding: bool = False) -> None:
     # val = val.encode('unicode-escape').replace('\\\\', '\\')
     val_bytes = val.encode(DEFAULT_CHARSET)
     buf.write(val_bytes + b'\x00')
@@ -242,12 +243,12 @@ def write_cstring(val: str, buf: BytesIO, padding: bool = False) -> None:
         buf.write(b'\x00')
 
 
-def write_cunicode(val: str, buf: BytesIO) -> None:
+def write_cunicode(val: str, buf: BufferedIOBase) -> None:
     uni = val.encode('utf-16-le')
     buf.write(uni + b'\x00\x00')
 
 
-def write_sized_string(val: str, buf: BytesIO, string: bool = True) -> None:
+def write_sized_string(val: str, buf: BufferedIOBase, string: bool = True) -> None:
     size = len(val)
     write_short(size, buf)
     if string:
@@ -260,7 +261,7 @@ def put_bits(bits: int, target: int, start: int, count: int, length: int = 16) -
     return target | bits << (length - start - count)
 
 
-def write_dos_datetime(val: datetime, buf: BytesIO) -> None:
+def write_dos_datetime(val: datetime, buf: BufferedIOBase) -> None:
     date = time = 0
     date = put_bits(val.year - 1980, date, 0, 7)
     date = put_bits(val.month, date, 7, 4)
@@ -333,7 +334,7 @@ def bytes_from_guid(guid: str) -> bytes:
     return bytes([int(x, 16) for x in ordered_nums])
 
 
-def assert_lnk_signature(f: BytesIO) -> None:
+def assert_lnk_signature(f: BufferedIOBase) -> None:
     f.seek(0)
     sig = f.read(4)
     guid = f.read(16)
@@ -447,7 +448,10 @@ class ModifierKeys(Flags):
 # }
 
 class IDListEntry:
-    ...
+    @property
+    @abstractmethod
+    def bytes(self) -> bytes:
+        ...
 
 
 class RootEntry(IDListEntry):
@@ -486,16 +490,18 @@ class RootEntry(IDListEntry):
 
 class DriveEntry(IDListEntry):
 
-    def __init__(self, drive: bytes) -> None:
+    def __init__(self, drive: Union[bytes, str]) -> None:
         if len(drive) == 23:
+            assert isinstance(drive, bytes)
             # binary data from parsed lnk
             self.drive = drive[1:3]
         else:
             # text representation
+            assert isinstance(drive, str)
             m = _DRIVE_PATTERN.match(drive.strip())
             if m:
-                self.drive = m.groups()[0].upper() + ':'
-                self.drive = self.drive.encode()
+                drive = m.groups()[0].upper() + ':'
+                self.drive = drive.encode()
             else:
                 raise FormatException("This is not a valid drive: " + str(drive))
 
@@ -636,6 +642,15 @@ class PathSegmentEntry(IDListEntry):
         if self.full_name is None:
             return b''
         self._validate()
+
+        # explicit check to have strict types without optionals
+        assert self.short_name is not None
+        assert self.type is not None
+        assert self.file_size is not None
+        assert self.modified is not None
+        assert self.created is not None
+        assert self.accessed is not None
+
         out = BytesIO()
         entry_type = self.type
 
@@ -732,11 +747,12 @@ class UwpSubBlock:
         type: Optional[int] = None,
         value: Optional[Union[str, bytes]] = None,
     ) -> None:
+        if type is None and bytes is None:
+            raise ValueError("Either bytes or type must be set")
         self._data = bytes or b''
-        self.type = type
         self.value = value
-        self.name = None
-        if self.type is not None:
+        if type is not None:
+            self.type = type
             self.name = self.block_names.get(self.type, 'UNKNOWN')
         if not bytes:
             return
@@ -791,7 +807,8 @@ class UwpMainBlock:
     ) -> None:
         self._data = bytes or b''
         self._blocks = blocks or []
-        self.guid: str = guid
+        if guid is not None:
+            self.guid: str = guid
         if not bytes:
             return
         buf = BytesIO(bytes)
@@ -928,8 +945,9 @@ class LinkTargetIDList:
         if not raw:
             return
         elif raw[0][0] == 0x1F:
-            self.items.append(RootEntry(raw[0]))
-            if self.items[0].root == ROOT_MY_COMPUTER:
+            root_entry = RootEntry(raw[0])
+            self.items.append(root_entry)
+            if root_entry.root == ROOT_MY_COMPUTER:
                 if len(raw[1]) == 0x17:
                     self.items.append(DriveEntry(raw[1]))
                 elif raw[1][0:2] == b'\x2E\x80':  # ROOT_KNOWN_FOLDER
@@ -937,7 +955,7 @@ class LinkTargetIDList:
                 else:
                     raise ValueError("This seems to be an absolute link which requires a drive as second element.")
                 items = raw[2:]
-            elif self.items[0].root == ROOT_NETWORK_PLACES:
+            elif root_entry.root == ROOT_NETWORK_PLACES:
                 raise NotImplementedError(
                     "Parsing network lnks has not yet been implemented. "
                     "If you need it just contact me and we'll see...",
@@ -953,7 +971,7 @@ class LinkTargetIDList:
                 self.items.append(PathSegmentEntry(item))
 
     def get_path(self) -> str:
-        segments = []
+        segments: List[str] = []
         for item in self.items:
             if type(item) == RootEntry:
                 segments.append('%' + item.root + '%')
@@ -963,16 +981,22 @@ class LinkTargetIDList:
                 if item.full_name is not None:
                     segments.append(item.full_name)
             else:
-                segments.append(item)
+                segments.append(str(item))
         return '\\'.join(segments)
 
     def _validate(self) -> None:
         if not len(self.items):
             return
-        if type(self.items[0]) == RootEntry and self.items[0].root == ROOT_MY_COMPUTER:
-            if type(self.items[1]) == DriveEntry:
+        root_entry = self.items[0]
+        if isinstance(root_entry, RootEntry) and root_entry.root == ROOT_MY_COMPUTER:
+            second_entry = self.items[1]
+            if isinstance(second_entry, DriveEntry):
                 return
-            if type(self.items[1]) == PathSegmentEntry and self.items[1].full_name.startswith('::'):
+            if (
+                isinstance(second_entry, PathSegmentEntry)
+                and second_entry.full_name is not None
+                and second_entry.full_name.startswith('::')
+            ):
                 return
             raise ValueError("A drive is required for absolute lnks")
 
@@ -982,9 +1006,6 @@ class LinkTargetIDList:
         out = BytesIO()
         for item in self.items:
             bytes = item.bytes
-            # skip invalid
-            if bytes is None:
-                continue
             write_short(len(bytes) + 2, out)  # len + terminator
             out.write(bytes)
         out.write(b'\x00\x00')
@@ -999,7 +1020,7 @@ class LinkTargetIDList:
 
 class LinkInfo:
 
-    def __init__(self, lnk: Optional[BytesIO] = None) -> None:
+    def __init__(self, lnk: Optional[BufferedIOBase] = None) -> None:
         if lnk is not None:
             self.start = lnk.tell()
             self.size = read_int(lnk)
@@ -1031,7 +1052,7 @@ class LinkInfo:
             self.base_name: str = ''
             self._path: str = ''
 
-    def _parse_path_elements(self, lnk: BytesIO) -> None:
+    def _parse_path_elements(self, lnk: BufferedIOBase) -> None:
         if self.remote:
             # 20 is the offset of the network share name
             lnk.seek(self.start + self.offs_network_volume_table + 20)
@@ -1055,7 +1076,7 @@ class LinkInfo:
         if self.local:
             self._path = self.local_base_path
 
-    def write(self, lnk: BytesIO) -> None:
+    def write(self, lnk: BufferedIOBase) -> None:
         if self.remote is None:
             raise MissingInformationException("No location information given.")
         self.start = lnk.tell()
@@ -1094,7 +1115,7 @@ class LinkInfo:
             self.offs_network_volume_table = 0
             self.offs_base_name = self.offs_local_base_path + self.size_local_base_path
 
-    def _write_network_volume_table(self, buf: BytesIO) -> None:
+    def _write_network_volume_table(self, buf: BufferedIOBase) -> None:
         write_int(self.size_network_volume_table, buf)
         write_int(2, buf)  # ?
         write_int(20, buf)  # size of Network Volume Table
@@ -1102,12 +1123,11 @@ class LinkInfo:
         write_int(131072, buf)  # ?
         write_cstring(self.network_share_name, buf)
 
-    def _write_local_volume_table(self, buf: BytesIO) -> None:
+    def _write_local_volume_table(self, buf: BufferedIOBase) -> None:
         write_int(self.size_local_volume_table, buf)
-        try:
-            drive_type = _DRIVE_TYPE_IDS[self.drive_type]
-        except KeyError:
+        if self.drive_type is None or self.drive_type not in _DRIVE_TYPE_IDS:
             raise ValueError("This is not a valid drive type: %s" % self.drive_type)
+        drive_type = _DRIVE_TYPE_IDS[self.drive_type]
         write_int(drive_type, buf)
         write_int(self.drive_serial, buf)
         write_int(16, buf)  # volume name offset
@@ -1119,7 +1139,7 @@ class LinkInfo:
 
     def __str__(self) -> str:
         s = "File Location Info:"
-        if self._path is None:
+        if not self._path:
             return s + " <not specified>"
         if self.remote:
             s += "\n  (remote)"
@@ -1160,19 +1180,18 @@ class ExtraData_DataBlock:
 class ExtraData_Unparsed(ExtraData_DataBlock):
     def __init__(
         self,
+        signature: int,
         bytes: Optional[bytes] = None,
-        signature: Optional[int] = None,
         data: Optional[bytes] = None,
     ) -> None:
         self._signature = signature
         self._size = None
-        self.data = data
-        # if data:
-        #     self._size = len(data)
-        if bytes:
-            # self._size = len(bytes)
+        if bytes is not None:
             self.data = bytes
-            # self.read(bytes)
+        elif data is not None:
+            self.data = data
+        else:
+            raise ValueError("Either bytes or data must be given.")
 
     # def read(self, bytes):
     #     buf = BytesIO(bytes)
@@ -1251,12 +1270,15 @@ class TypedPropertyValue:
         type_: Optional[int] = None,
         value: Optional[bytes] = None,
     ) -> None:
-        self.type: int = type_
-        self.value: bytes = value or b''
-        if bytes_:
-            self.type = read_short(BytesIO(bytes_))
+        if bytes_ is not None:
+            self.type: int = read_short(BytesIO(bytes_))
             padding = bytes_[2:4]
-            self.value = bytes_[4:]
+            self.value: bytes = bytes_[4:]
+        elif type_ is not None and value is not None:
+            self.type = type_
+            self.value = value or b''
+        else:
+            raise ValueError("Either bytes or type and value must be given.")
 
     def set_string(self, value: str) -> None:
         self.type = 0x1f
@@ -1282,27 +1304,29 @@ class TypedPropertyValue:
         value = self.value
         if self.type == 0x1F:
             size = value[:4]
-            value = value[4:].decode('utf-16-le')
-        if self.type == 0x15:
-            value = unpack('<Q', value)[0]
-        if self.type == 0x13:
-            value = unpack('<I', value)[0]
-        if self.type == 0x14:
-            value = unpack('<q', value)[0]
-        if self.type == 0x16:
-            value = unpack('<i', value)[0]
-        if self.type == 0x17:
-            value = unpack('<I', value)[0]
-        if self.type == 0x48:
-            value = guid_to_str(value)
-        if self.type == 0x40:
+            value_str = value[4:].decode('utf-16-le')
+        elif self.type == 0x15:
+            value_str = unpack('<Q', value)[0]
+        elif self.type == 0x13:
+            value_str = unpack('<I', value)[0]
+        elif self.type == 0x14:
+            value_str = unpack('<q', value)[0]
+        elif self.type == 0x16:
+            value_str = unpack('<i', value)[0]
+        elif self.type == 0x17:
+            value_str = unpack('<I', value)[0]
+        elif self.type == 0x48:
+            value_str = guid_to_str(value)
+        elif self.type == 0x40:
             # FILETIME (Packet Version)
             stream = BytesIO(value)
             low = read_int(stream)
             high = read_int(stream)
             num = (high << 32) + low
-            value = convert_time_to_unix(num)
-        return f'{hex(self.type)}: {value!s}'
+            value_str = str(convert_time_to_unix(num))
+        else:
+            value_str = str(value)
+        return f'{hex(self.type)}: {value_str!s}'
 
 
 class PropertyStore:
@@ -1314,11 +1338,9 @@ class PropertyStore:
         is_strings: bool = False,
     ) -> None:
         self.is_strings = is_strings
-        self.properties = []
-        self.format_id = format_id
+        self.format_id = format_id or b''
         self._is_end = False
-        if properties:
-            self.properties = properties
+        self.properties: List[Tuple[Union[str, int], TypedPropertyValue]] = properties or []
         if bytes:
             self.read(bytes)
 
@@ -1360,6 +1382,7 @@ class PropertyStore:
         for name, value in self.properties:
             value_bytes = value.bytes
             if self.is_strings:
+                assert isinstance(name, str)
                 name_bytes = name.encode('utf-16-le')
                 value_size = 9 + len(name_bytes) + len(value_bytes)
                 write_int(value_size, properties)
@@ -1368,6 +1391,7 @@ class PropertyStore:
                 properties.write(b'\x00')
                 properties.write(name_bytes)
             else:
+                assert isinstance(name, int)
                 value_size = 9 + len(value_bytes)
                 write_int(value_size, properties)
                 write_int(name, properties)
@@ -1484,7 +1508,7 @@ EXTRA_DATA_TYPES_CLASSES: Dict[str, Type[ExtraData_DataBlock]] = {
 
 class ExtraData:
     # EXTRA_DATA = *EXTRA_DATA_BLOCK TERMINAL_BLOCK
-    def __init__(self, lnk: Optional[BytesIO] = None, blocks: Optional[List[ExtraData_DataBlock]] = None) -> None:
+    def __init__(self, lnk: Optional[BufferedIOBase] = None, blocks: Optional[List[ExtraData_DataBlock]] = None) -> None:
         self.blocks = []
         if blocks:
             self.blocks = blocks
@@ -1523,7 +1547,7 @@ class ExtraData:
 
 class Lnk:
 
-    def __init__(self, f: Optional[Union[str, BufferedReader]] = None) -> None:
+    def __init__(self, f: Optional[Union[str, BufferedIOBase]] = None) -> None:
         self.file: Optional[str] = None
         if isinstance(f, str):
             self.file = f
@@ -1541,7 +1565,7 @@ class Lnk:
         self.file_size = 0
         self.icon_index = 0
         self._show_command = WINDOW_NORMAL
-        self.hot_key = None
+        self.hot_key: Optional[str] = None
         self._link_info = LinkInfo()
         self.description = None
         self.relative_path = None
@@ -1552,33 +1576,32 @@ class Lnk:
         if f is not None:
             assert_lnk_signature(f)
             self._parse_lnk_file(f)
-        if self.file:
             f.close()
 
-    def _read_hot_key(self, lnk: BytesIO) -> str:
+    def _read_hot_key(self, lnk: BufferedIOBase) -> str:
         low = read_byte(lnk)
         high = read_byte(lnk)
         key = _KEYS.get(low, '')
         modifier = high and str(ModifierKeys(high)) or ''
         return modifier + key
 
-    def _write_hot_key(self, hot_key: str, lnk: BytesIO) -> None:
+    def _write_hot_key(self, hot_key: Optional[str], lnk: BufferedIOBase) -> None:
         if hot_key is None or not hot_key:
             low = high = 0
         else:
-            hot_key = hot_key.split('+')
+            hot_key_parts = hot_key.split('+')
             try:
-                low = _KEY_CODES[hot_key[-1]]
+                low = _KEY_CODES[hot_key_parts[-1]]
             except KeyError:
-                raise InvalidKeyException("Cannot find key code for %s" % hot_key[1])
+                raise InvalidKeyException("Cannot find key code for %s" % hot_key_parts[1])
             modifiers = ModifierKeys()
-            for modifier in hot_key[:-1]:
+            for modifier in hot_key_parts[:-1]:
                 modifiers[modifier.upper()] = True
             high = modifiers.bytes
         write_byte(low, lnk)
         write_byte(high, lnk)
 
-    def _parse_lnk_file(self, lnk: BytesIO) -> None:
+    def _parse_lnk_file(self, lnk: BufferedIOBase) -> None:
         # SHELL_LINK_HEADER [LINKTARGET_IDLIST] [LINKINFO] [STRING_DATA] *EXTRA_DATA
 
         # SHELL_LINK_HEADER
@@ -1620,25 +1643,23 @@ class Lnk:
         # *EXTRA_DATA
         self.extra_data = ExtraData(lnk)
 
-    def save(self, f: Optional[Union[str, IOBase]] = None, force_ext: bool = False) -> None:
+    def save(self, f: Optional[Union[str, BufferedIOBase]] = None, force_ext: bool = False) -> None:
+        f = f or self.file
+        is_opened_here = False
+        if isinstance(f, str):
+            filename: str = f
+            if force_ext and not filename.endswith('.lnk'):
+                filename += '.lnk'
+            f = open(filename, 'wb')
+            is_opened_here = True
         if f is None:
-            f = self.file
-        if f is None:
-            raise ValueError("File (name) missing for saving the lnk")
-        is_file = hasattr(f, 'write')
-        if not is_file:
-            if not type(f) == str and not type(f) == str:
-                raise ValueError("Need a writeable object or a file name to save to, got %s" % f)
-            if force_ext:
-                if not f.lower().endswith('.lnk'):
-                    f += '.lnk'
-            f = open(f, 'wb')
+            raise ValueError("No file specified for saving LNK file")
         self.write(f)
         # only close the stream if it's our own
-        if not is_file:
+        if is_opened_here:
             f.close()
 
-    def write(self, lnk: BytesIO) -> None:
+    def write(self, lnk: BufferedIOBase) -> None:
         lnk.write(_SIGNATURE)
         lnk.write(_GUID)
         write_int(self.link_flags.bytes, lnk)
@@ -1772,11 +1793,11 @@ class Lnk:
         self,
         path: str,
         drive_type: Optional[str] = None,
-        drive_serial: Optional[str] = None,
+        drive_serial: Optional[int] = None,
         volume_label: Optional[str] = None,
     ) -> None:
         self._link_info.drive_type = drive_type or DRIVE_UNKNOWN
-        self._link_info.drive_serial = drive_serial or ''
+        self._link_info.drive_serial = drive_serial or 0
         self._link_info.volume_label = volume_label or ''
         self._link_info.local_base_path = path
         self._link_info.local = True
@@ -1931,8 +1952,8 @@ def from_segment_list(
         drive = data[0].encode("ascii")
         data.pop(0)
         entries.append(DriveEntry(drive))
-    for level in data:
-        assert isinstance(level, dict)
+    data_without_root: List[Dict[str, Any]] = data  # type: ignore
+    for level in data_without_root:
         segment = PathSegmentEntry()
         segment.type = level['type']
         if level['type'] == TYPE_FOLDER:
@@ -1947,7 +1968,7 @@ def from_segment_list(
         entries.append(segment)
     lnk.shell_item_id_list = LinkTargetIDList()
     lnk.shell_item_id_list.items = entries
-    if data[-1]['type'] == TYPE_FOLDER:
+    if data_without_root[-1]['type'] == TYPE_FOLDER:
         lnk.file_flags.directory = True
     if lnk_name:
         lnk.save(lnk_name)
