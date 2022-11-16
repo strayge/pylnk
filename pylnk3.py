@@ -288,7 +288,10 @@ def convert_time_to_unix(windows_time: int) -> datetime:
 
 def convert_time_to_windows(unix_time: Union[int, datetime]) -> int:
     if isinstance(unix_time, datetime):
-        unix_time_int = time.mktime(unix_time.timetuple())
+        try:
+            unix_time_int = time.mktime(unix_time.timetuple())
+        except OverflowError:
+            unix_time_int = time.mktime(datetime.now().timetuple())
     else:
         unix_time_int = unix_time
     return int((unix_time_int + 11644473600) * 10000000)
