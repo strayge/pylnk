@@ -28,4 +28,4 @@ jobs:
         pytest
     - name: mypy
       run: |
-        mypy . || echo ""
+        mypy .
