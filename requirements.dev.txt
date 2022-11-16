@@ -1,8 +1,13 @@
+# test ones
 pytest-cov
 pytest
 flake8-isort
 flake8-commas
+Flake8-pyproject == 1.1.0.post0
 flake8
 mypy
-invoke
+
+# build / upload ones
+build
+pdm-pep517
 twine

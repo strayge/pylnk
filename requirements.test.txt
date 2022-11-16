@@ -1,6 +1,0 @@
-pytest-cov
-pytest
-flake8-isort
-flake8-commas
-flake8
-mypy

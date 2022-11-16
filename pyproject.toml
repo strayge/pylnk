@@ -1,0 +1,91 @@
+[project]
+name = "pylnk3"
+description = "Windows LNK File Parser and Creator"
+keywords = ["lnk", "shortcut", "windows"]
+readme = "README.md"
+authors = [
+    {name = "strayge", email = "strayge@gmail.com"},
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.7"
+license = {text = "GNU Library or Lesser General Public License (LGPL)"}
+dynamic = ["version"]
+urls.homepage = "https://github.com/strayge/pylnk"
+
+[project.scripts]
+pylnk3 = "pylnk3:cli"
+
+[tool.pdm]
+version = { source = "scm" }
+build.includes = ["pylnk3.py"]
+build.source-includes = ["tests"]
+
+[build-system]
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"
+
+[tool.flake8]
+exclude = [
+    ".git",
+    ".idea",
+    "__pycache__",
+    "venv*",
+]
+max-line-length = 130
+max-cognitive-complexity = 60
+ignore = [
+    # trailing comma prohibited
+    "C819",
+    # line break before binary operator
+    "W503",
+    # allow unused variables to name parsed data
+    "F841",
+]
+per-file-ignores = [
+    # unused imports
+    "*/__init__.py:F401",
+]
+
+[tool.mypy]
+exclude = [
+    "tests",
+    "venv",
+]
+namespace_packages = true
+ignore_missing_imports = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_return_any = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+addopts = [
+    "-s",
+    "-l",
+    "--cov",
+    "--cov-branch",
+    "--cov-report=xml",
+]
+
+[tool.coverage.run]
+relative_files = true
+branch = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 70
+precision = 2
