@@ -108,23 +108,27 @@ class PathSegmentEntry(IDListEntry):
                 version_offset = read_short(buf)
 
     @classmethod
-    def create_for_path(cls, path: str) -> 'PathSegmentEntry':
+    def create_for_path(cls, path: str, is_file: Optional[bool] = None) -> 'PathSegmentEntry':
         entry = cls()
-        entry.type = os.path.isdir(path) and TYPE_FOLDER or TYPE_FILE
         try:
             st = os.stat(path)
             entry.file_size = st.st_size
             entry.modified = datetime.fromtimestamp(st.st_mtime)
             entry.created = datetime.fromtimestamp(st.st_ctime)
             entry.accessed = datetime.fromtimestamp(st.st_atime)
+            if is_file is None:
+                is_file = not os.path.isdir(path)
         except FileNotFoundError:
             now = datetime.now()
             entry.file_size = 0
             entry.modified = now
             entry.created = now
             entry.accessed = now
+            if is_file is None:
+                is_file = '.' in ntpath.split(path)[-1][1:]
         entry.short_name = ntpath.split(path)[1]
         entry.full_name = entry.short_name
+        entry.type = TYPE_FILE if is_file else TYPE_FOLDER
         return entry
 
     def _validate(self) -> None:

@@ -84,7 +84,9 @@ def for_file(
             DriveEntry(levels[0]),
         ]
         for level in levels[1:]:
-            segment = PathSegmentEntry.create_for_path(level)
+            is_last_level = level == levels[-1]
+            # consider all segments before last as directory
+            segment = PathSegmentEntry.create_for_path(level, is_file=None if is_last_level else False)
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
