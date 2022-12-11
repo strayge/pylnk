@@ -8,10 +8,10 @@ from pylnk3.flags import Flags, ModifierKeys
 from pylnk3.id_list.id_list import LinkTargetIDList
 from pylnk3.link_info import DRIVE_UNKNOWN, LinkInfo
 from pylnk3.utils.data import convert_time_to_unix, convert_time_to_windows
-from pylnk3.utils.read_write import (read_byte, read_double, read_int,
-                                     read_short, read_sized_string, write_byte,
-                                     write_double, write_int, write_short,
-                                     write_sized_string)
+from pylnk3.utils.read_write import (
+    read_byte, read_double, read_int, read_short, read_sized_string, write_byte, write_double,
+    write_int, write_short, write_sized_string,
+)
 
 _SIGNATURE = b'L\x00\x00\x00'
 _GUID = b'\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'

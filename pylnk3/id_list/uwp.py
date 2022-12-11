@@ -3,9 +3,10 @@ from typing import List, Optional, Union
 
 from pylnk3.id_list.base import IDListEntry
 from pylnk3.utils.guid import bytes_from_guid, guid_from_bytes
-from pylnk3.utils.read_write import (read_byte, read_cunicode, read_int,
-                                     read_short, write_byte, write_cunicode,
-                                     write_int, write_short)
+from pylnk3.utils.read_write import (
+    read_byte, read_cunicode, read_int, read_short, write_byte, write_cunicode, write_int,
+    write_short,
+)
 
 
 class UwpSubBlock:

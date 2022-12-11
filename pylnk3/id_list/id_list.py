@@ -4,8 +4,7 @@ from typing import List, Optional
 from pylnk3.id_list.base import IDListEntry
 from pylnk3.id_list.drive import DriveEntry
 from pylnk3.id_list.path import PathSegmentEntry
-from pylnk3.id_list.root import (ROOT_MY_COMPUTER, ROOT_NETWORK_PLACES,
-                                 RootEntry)
+from pylnk3.id_list.root import ROOT_MY_COMPUTER, ROOT_NETWORK_PLACES, RootEntry
 from pylnk3.id_list.uwp import UwpSegmentEntry
 from pylnk3.utils.read_write import read_short, write_short
 

@@ -2,8 +2,7 @@ from io import BufferedIOBase
 from typing import Optional
 
 from pylnk3.exceptions import MissingInformationException
-from pylnk3.utils.read_write import (read_cstring, read_int, write_byte,
-                                     write_cstring, write_int)
+from pylnk3.utils.read_write import read_cstring, read_int, write_byte, write_cstring, write_int
 
 DRIVE_NO_ROOT_DIR = "No root directory"
 DRIVE_REMOVABLE = "Removable"

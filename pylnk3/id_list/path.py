@@ -7,11 +7,10 @@ from typing import Optional
 from pylnk3.exceptions import MissingInformationException
 from pylnk3.id_list.base import IDListEntry
 from pylnk3.utils.guid import bytes_from_guid, guid_from_bytes
-from pylnk3.utils.read_write import (read_cstring, read_cunicode,
-                                     read_dos_datetime, read_double, read_int,
-                                     read_short, write_cstring, write_cunicode,
-                                     write_dos_datetime, write_double,
-                                     write_int, write_short)
+from pylnk3.utils.read_write import (
+    read_cstring, read_cunicode, read_dos_datetime, read_double, read_int, read_short,
+    write_cstring, write_cunicode, write_dos_datetime, write_double, write_int, write_short,
+)
 
 _ENTRY_TYPES = {
     0x00: 'KNOWN_FOLDER',

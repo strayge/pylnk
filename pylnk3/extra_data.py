@@ -5,8 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from pylnk3.utils.data import convert_time_to_unix
 from pylnk3.utils.guid import guid_to_str
 from pylnk3.utils.padding import padding
-from pylnk3.utils.read_write import (read_byte, read_int, read_short,
-                                     write_int, write_short)
+from pylnk3.utils.read_write import read_byte, read_int, read_short, write_int, write_short
 
 
 class TypedPropertyValue:

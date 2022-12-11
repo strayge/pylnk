@@ -71,6 +71,11 @@ disallow_untyped_decorators = true
 warn_return_any = true
 warn_unreachable = true
 
+[tool.isort]
+line_length = 100
+multi_line_output = 6
+include_trailing_comma = true
+
 [tool.pytest.ini_options]
 testpaths = "tests"
 addopts = [
