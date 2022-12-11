@@ -27,7 +27,7 @@ for more info use help for each action (ex.: "pylnk3 create -h")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = argparse.ArgumentParser(add_help=False, prog='pylnk3')
     subparsers = parser.add_subparsers(dest='action', metavar='{p, c, d}')
     parser.add_argument('--help', '-h', action='store_true')
 
