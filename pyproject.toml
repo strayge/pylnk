@@ -60,7 +60,6 @@ per-file-ignores = [
 
 [tool.mypy]
 exclude = [
-    "tests",
     "venv",
 ]
 namespace_packages = true

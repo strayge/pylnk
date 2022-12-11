@@ -4,7 +4,7 @@ from pylnk3 import Lnk
 from pylnk3.id_list.root import ROOT_UWP_APPS
 
 
-def get_sub_blocks(lnk: Lnk):
+def get_sub_blocks(lnk: Lnk) -> dict:
     uwp_segment = lnk.shell_item_id_list.items[1]
     sub_blocks = {}
     for main_block in uwp_segment._blocks:
@@ -15,7 +15,7 @@ def get_sub_blocks(lnk: Lnk):
     return sub_blocks
 
 
-def test_uwp_read(examples_path):
+def test_uwp_read(examples_path: str) -> None:
     full_filename = os.path.join(examples_path, 'uwp_calc.lnk')
 
     lnk = Lnk(full_filename)
@@ -30,7 +30,7 @@ def test_uwp_read(examples_path):
     assert sub_blocks['DisplayName'] == 'Calculator'
 
 
-def test_uwp_write(examples_path, temp_filename):
+def test_uwp_write(examples_path: str, temp_filename: str) -> None:
     full_filename = os.path.join(examples_path, 'uwp_calc.lnk')
 
     lnk = Lnk(full_filename)

@@ -6,11 +6,12 @@ from pylnk3 import Lnk
 from pylnk3.extra_data import ExtraData_EnvironmentVariableDataBlock
 
 
-def check_path(lnk: Lnk, path: str):
+def check_path(lnk: Lnk, path: str) -> None:
     assert lnk.path == path
 
 
-def check_extra_env_path(lnk: Lnk, path: str):
+def check_extra_env_path(lnk: Lnk, path: str) -> None:
+    assert lnk.extra_data
     extra_env = [
         block for block in lnk.extra_data.blocks
         if isinstance(block, ExtraData_EnvironmentVariableDataBlock)
@@ -28,7 +29,7 @@ def check_extra_env_path(lnk: Lnk, path: str):
         ('net_folder2_file2.lnk', '\\\\192.168.138.2\\STORAGE\\Downloads\\folder12\\file12.txt'),
     ),
 )
-def test_network_lnk(examples_path, temp_filename, filename: str, path: str):
+def test_network_lnk(examples_path: str, temp_filename: str, filename: str, path: str) -> None:
     full_filename = os.path.join(examples_path, filename)
     # read
     lnk = Lnk(full_filename)
