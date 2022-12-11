@@ -57,6 +57,7 @@ def for_file(
     icon_index: int = 0,
     work_dir: Optional[str] = None,
     window_mode: Optional[str] = None,
+    is_file: Optional[bool] = None,
 ) -> Lnk:
     lnk = create(lnk_name)
     lnk.link_flags.IsUnicode = True
@@ -86,7 +87,7 @@ def for_file(
         for level in levels[1:]:
             is_last_level = level == levels[-1]
             # consider all segments before last as directory
-            segment = PathSegmentEntry.create_for_path(level, is_file=None if is_last_level else False)
+            segment = PathSegmentEntry.create_for_path(level, is_file=is_file if is_last_level else False)
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements

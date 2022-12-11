@@ -3,8 +3,11 @@ import subprocess
 import sys
 from typing import Optional
 
+import pytest
+
 from pylnk3 import Lnk
 from pylnk3.structures import PathSegmentEntry
+from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.structures.id_list.path import TYPE_FILE, TYPE_FOLDER
 
 
@@ -27,32 +30,34 @@ def call_cli(params: str) -> Optional[str]:
     return result.stdout.decode()
 
 
+def check_segment_type(segment: IDListEntry, expected_type: str) -> None:
+    assert isinstance(segment, PathSegmentEntry)
+    assert segment.type == expected_type
+
+
 def test_cli_create_local_file(temp_filename: str) -> None:
     path = 'C:\\folder\\file.txt'
     call_cli(f'c {quote_cmd(path)} {temp_filename}')
     lnk = Lnk(temp_filename)
     assert lnk.path == path
-    # check correct entries type
-    directory = lnk.shell_item_id_list.items[-2]
-    assert isinstance(directory, PathSegmentEntry)
-    assert directory.type == TYPE_FOLDER
-    file = lnk.shell_item_id_list.items[-1]
-    assert isinstance(file, PathSegmentEntry)
-    assert file.type == TYPE_FILE
 
 
-def test_cli_create_local_directory(temp_filename: str) -> None:
-    path = 'C:\\Windows\\System32'
-    call_cli(f'c {quote_cmd(path)} {temp_filename}')
+@pytest.mark.parametrize(
+    ('path', 'params', 'last_entry_type'),
+    (
+        # detect by dot in name
+        ('C:\\folder\\file.txt', '', TYPE_FILE),
+        ('C:\\folder\\folder', '', TYPE_FOLDER),
+        # overrive with cli argument
+        ('C:\\folder\\folder.with.txt', '--directory', TYPE_FOLDER),
+        ('C:\\folder\\file_without_txt', '--file', TYPE_FILE),
+    ),
+)
+def test_cli_local_link_type(temp_filename: str, path: str, params: str, last_entry_type: str) -> None:
+    call_cli(f'c {quote_cmd(path)} {temp_filename} {params}')
     lnk = Lnk(temp_filename)
-    assert lnk.path == path
-    # check correct entries type
-    directory1 = lnk.shell_item_id_list.items[-2]
-    assert isinstance(directory1, PathSegmentEntry)
-    assert directory1.type == TYPE_FOLDER
-    directory2 = lnk.shell_item_id_list.items[-1]
-    assert isinstance(directory2, PathSegmentEntry)
-    assert directory2.type == TYPE_FOLDER
+    check_segment_type(lnk.shell_item_id_list.items[-2], TYPE_FOLDER)
+    check_segment_type(lnk.shell_item_id_list.items[-1], last_entry_type)
 
 
 def test_cli_create_net(temp_filename: str) -> None:

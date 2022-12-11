@@ -44,6 +44,10 @@ def main() -> None:
     parser_create.add_argument('--icon-index', '-ii', type=int, default=0, nargs='?', help='icon index')
     parser_create.add_argument('--workdir', '-w', nargs='?', help='working directory')
     parser_create.add_argument('--mode', '-m', nargs='?', choices=['Maximized', 'Normal', 'Minimized'], help='window mode')
+    parser_create.add_argument('--file', action='store_true', help='threat target as file (by default guessed by dot in target)')
+    parser_create.add_argument(
+        '--directory', action='store_true', help='threat target as directory (by default guessed by dot in target)',
+    )
 
     parser_dup = subparsers.add_parser('duplicate', aliases=['d'], help='read and write lnk file')
     parser_dup.add_argument('filename', help='lnk filename to read')
@@ -55,11 +59,17 @@ def main() -> None:
         exit(1)
 
     if args.action in ('create', 'c'):
+        is_file = None
+        if args.file:
+            is_file = True
+        elif args.directory:
+            is_file = False
         for_file(
             args.target, args.name, arguments=args.arguments,
             description=args.description, icon_file=args.icon,
             icon_index=args.icon_index, work_dir=args.workdir,
             window_mode=args.mode,
+            is_file=is_file,
         )
     elif args.action in ('parse', 'p'):
         lnk = parse(args.filename)

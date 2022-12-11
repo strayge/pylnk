@@ -61,6 +61,8 @@ optional arguments:
                         working directory
   --mode [{Maximized,Normal,Minimized}], -m [{Maximized,Normal,Minimized}]
                         window mode
+  --file                threat target as file (by default guessed by dot in target)
+  --directory           threat target as directory (by default guessed by dot in target)
 ```
 
 #### Examples
@@ -72,6 +74,10 @@ pylnk3 create c:\1.txt text.lnk -m Minimized -d "Description"
 ```
 
 ## Changes
+
+**1.0.0a1**
+[FIX] fixed building links for non-existing locally paths (guessing target type by dot in name)
+added `--file` / `--directory` create command options to override target type guessing
 
 **0.4.2**
 changed logic for Lnk.path choose (in case of different paths presents at different structures)
