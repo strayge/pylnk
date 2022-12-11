@@ -4,9 +4,9 @@
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/pylnk3.svg)](https://pypi.python.org/pypi/pylnk3/)
 [![PyPI download month](https://img.shields.io/pypi/dm/pylnk3.svg)](https://pypi.python.org/pypi/pylnk3/)
 
-Python library for reading and writing Windows shortcut files (.lnk).
-Converted to support python 3.
-[Original](https://sourceforge.net/p/pylnk/code/HEAD/tree/trunk/pylnk.py) version written by Tim-Christian Mundt.
+Python library for reading and writing Windows shortcut files (.lnk).  
+Converted to support python 3.  
+[Original](https://sourceforge.net/p/pylnk/code/HEAD/tree/trunk/pylnk.py) version written by Tim-Christian Mundt.  
 
 This library can parse .lnk files and extract all relevant information from
 them. Parsing a .lnk file yields a LNK object which can be altered and saved
@@ -75,32 +75,29 @@ pylnk3 create c:\1.txt text.lnk -m Minimized -d "Description"
 
 ## Changes
 
-**1.0.0a1**
-split single `pylnk3.py` to separated modules
-[FIX] fixed building links for non-existing locally paths (guessing target type by dot in name)
-added `--file` / `--directory` create command options to override target type guessing
+**1.0.0a1**  
+split single `pylnk3.py` to separated modules  
+[FIX] fixed building links for non-existing locally paths (guessing target type by dot in name)  
+added `--file` / `--directory` create command options to override target type guessing  
 
-**0.4.2**
-changed logic for Lnk.path choose (in case of different paths presents at different structures)
-read links with root as GUID of KNOWN_FOLDER
-[FIX] disabled padding for writing LinkInfo.local_base_path
+**0.4.2**  
+changed logic for Lnk.path choose (in case of different paths presents at different structures)  
+read links with root as GUID of KNOWN_FOLDER  
+[FIX] disabled padding for writing LinkInfo.local_base_path  
 
-**0.4.0**
-added support for network links
-reworked CLI (added more options for creating links)
-added entry point for call tool just like `pylnk3`
-[FIX] allow build links for non-existed (from this machine) paths
-[FIX] correct building links on Linux (now expect Windows-like path)
-[FIX] fixed path priority at parsing with both local & remote presents
+**0.4.0**  
+added support for network links  
+reworked CLI (added more options for creating links)  
+added entry point for call tool just like `pylnk3`  
+[FIX] allow build links for non-existed (from this machine) paths  
+[FIX] correct building links on Linux (now expect Windows-like path)  
+[FIX] fixed path priority at parsing with both local & remote presents  
 
+**0.3.0**  
+added support links to UWP apps  
 
-**0.3.0**
-added support links to UWP apps
+**0.2.1**  
+released to PyPI  
 
-
-**0.2.1**
-released to PyPI
-
-
-**0.2.0**
-converted to python 3
+**0.2.0**  
+converted to python 3  
