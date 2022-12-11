@@ -33,6 +33,15 @@ jobs:
 
       - run: mypy .
 
+      - name: cli
+        if: runner.os != 'Windows'
+        run: |
+          python -m build -n -w
+          cd dist
+          pip install *.whl
+          pylnk3 create --help
+          python -m pylnk3 create --help
+
   release:
     needs:
       - tests
