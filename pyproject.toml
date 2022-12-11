@@ -23,12 +23,10 @@ dynamic = ["version"]
 urls.homepage = "https://github.com/strayge/pylnk"
 
 [project.scripts]
-pylnk3 = "pylnk3:cli"
+pylnk3 = "pylnk3.__main__:main"
 
 [tool.pdm]
 version = { source = "scm" }
-build.includes = ["pylnk3.py"]
-build.source-includes = ["tests"]
 
 [build-system]
 requires = ["pdm-pep517>=1.0.0"]
