@@ -6,7 +6,7 @@ flake8-commas
 flake8-bugbear
 flake8-simplify
 flake8-debugger
-flake8-hangover
+flake8-hangover ; python_version >= "3.8"
 Flake8-pyproject == 1.1.0.post0
 flake8
 mypy
