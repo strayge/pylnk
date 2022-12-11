@@ -25,7 +25,7 @@ Mainly tool has two basic commands.
 
 #### Parse existed lnk file
 
-```sh
+```help
 pylnk3 parse [-h] filename [props [props ...]]
 
 positional arguments:
@@ -38,7 +38,7 @@ optional arguments:
 
 #### Create new lnk file
 
-```sh
+```help
 usage: pylnk3 create [-h] [--arguments [ARGUMENTS]] [--description [DESCRIPTION]] [--icon [ICON]]
                      [--icon-index [ICON_INDEX]] [--workdir [WORKDIR]] [--mode [{Maximized,Normal,Minimized}]]
                      target name
@@ -67,10 +67,13 @@ optional arguments:
 
 #### Examples
 ```sh
+# windows
 pylnk3 p filename.lnk
 pylnk3 c c:\prog.exe shortcut.lnk
 pylnk3 c \\192.168.1.1\share\file.doc doc.lnk
 pylnk3 create c:\1.txt text.lnk -m Minimized -d "Description"
+# linux (escaped backslashes)
+pylnk3 create 'c:\\dir\\file.txt' text.lnk -m Minimized -d "Description"
 ```
 
 ## Changes
