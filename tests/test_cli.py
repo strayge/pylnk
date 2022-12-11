@@ -13,11 +13,14 @@ def quote_cmd(line: str) -> str:
 
 
 def call_cli(params: str) -> Optional[str]:
+    # copy full environ, otherwise required SYSTEMROOT will be missing on Windows
+    env = os.environ.copy()
+    env['PYTHONPATH'] = os.path.abspath('.')
     exec_path = 'pylnk3'
     result = subprocess.run(
         f'{sys.executable} {exec_path} {params}', check=True, shell=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        env={'PYTHONPATH': os.path.abspath('.')},
+        env=env,
     )
     return result.stdout.decode()
 
