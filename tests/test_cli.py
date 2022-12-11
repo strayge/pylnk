@@ -9,7 +9,7 @@ from pylnk3 import Lnk
 def quote_cmd(line: str) -> str:
     if sys.platform == 'win32':
         return f'"{line}"'
-    return f"'{line}'"
+    return f"'{line}'"  # type: ignore[unreachable]
 
 
 def call_cli(params: str) -> Optional[str]:
