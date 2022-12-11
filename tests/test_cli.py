@@ -13,10 +13,11 @@ def quote_cmd(line: str) -> str:
 
 
 def call_cli(params: str) -> Optional[str]:
-    exec_path = 'pylnk3.py'
+    exec_path = 'pylnk3'
     result = subprocess.run(
-        f'python {exec_path} {params}', check=True, shell=True,
+        f'python3 {exec_path} {params}', check=True, shell=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env={'PYTHONPATH': os.path.abspath('.')},
     )
     return result.stdout.decode()
 

@@ -1,6 +1,7 @@
 import os
 
-from pylnk3 import ROOT_UWP_APPS, Lnk
+from pylnk3 import Lnk
+from pylnk3.id_list.root import ROOT_UWP_APPS
 
 
 def get_sub_blocks(lnk: Lnk):

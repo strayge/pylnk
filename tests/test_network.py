@@ -2,7 +2,8 @@ import os
 
 import pytest
 
-from pylnk3 import ExtraData_EnvironmentVariableDataBlock, Lnk
+from pylnk3 import Lnk
+from pylnk3.extra_data import ExtraData_EnvironmentVariableDataBlock
 
 
 def check_path(lnk: Lnk, path: str):
