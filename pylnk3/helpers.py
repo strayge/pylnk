@@ -30,8 +30,7 @@ from pylnk3.lnk import Lnk
 def path_levels(p: str) -> Iterable[str]:
     dirname, base = ntpath.split(p)
     if base != '':
-        for level in path_levels(dirname):
-            yield level
+        yield from path_levels(dirname)
     yield p
 
 
@@ -83,8 +82,10 @@ def for_file(
     else:
         # local link
         levels = list(path_levels(target_file))
-        elements = [RootEntry(ROOT_MY_COMPUTER),
-                    DriveEntry(levels[0])]
+        elements = [
+            RootEntry(ROOT_MY_COMPUTER),
+            DriveEntry(levels[0]),
+        ]
         for level in levels[1:]:
             segment = PathSegmentEntry.create_for_path(level)
             elements.append(segment)

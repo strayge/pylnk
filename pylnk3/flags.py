@@ -38,9 +38,7 @@ class Flags:
         return object.__getattribute__(self, key)
 
     def __setattr__(self, key: str, value: Any) -> None:
-        if '_flags' not in self.__dict__:
-            object.__setattr__(self, key, value)
-        elif key in self.__dict__:
+        if ('_flags' not in self.__dict__) or (key in self.__dict__):
             object.__setattr__(self, key, value)
         else:
             self.__setitem__(key, value)

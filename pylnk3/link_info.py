@@ -12,13 +12,15 @@ DRIVE_CDROM = "CD-ROM"
 DRIVE_RAMDISK = "Ram disk"
 DRIVE_UNKNOWN = "Unknown"
 
-_DRIVE_TYPES = {0: DRIVE_UNKNOWN,
-                1: DRIVE_NO_ROOT_DIR,
-                2: DRIVE_REMOVABLE,
-                3: DRIVE_FIXED,
-                4: DRIVE_REMOTE,
-                5: DRIVE_CDROM,
-                6: DRIVE_RAMDISK}
+_DRIVE_TYPES = {
+    0: DRIVE_UNKNOWN,
+    1: DRIVE_NO_ROOT_DIR,
+    2: DRIVE_REMOVABLE,
+    3: DRIVE_FIXED,
+    4: DRIVE_REMOTE,
+    5: DRIVE_CDROM,
+    6: DRIVE_RAMDISK,
+}
 _DRIVE_TYPE_IDS = dict((v, k) for k, v in _DRIVE_TYPES.items())
 
 _LINK_INFO_HEADER_DEFAULT = 0x1C

@@ -11,6 +11,21 @@ def get_prop(obj: Any, prop_queue: List[str]) -> Any:
     return attr
 
 
+HELP = '''
+Tool for read or create .lnk files
+
+usage: pylnk3.py [p]arse / [c]reate ...
+
+Examples:
+pylnk3 p filename.lnk
+pylnk3 c c:\\prog.exe shortcut.lnk
+pylnk3 c \\\\192.168.1.1\\share\\file.doc doc.lnk
+pylnk3 create c:\\1.txt text.lnk -m Minimized -d "Description"
+
+for more info use help for each action (ex.: "pylnk3 create -h")
+'''
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     subparsers = parser.add_subparsers(dest='action', metavar='{p, c, d}')
@@ -36,29 +51,17 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.help or not args.action:
-        print('''
-Tool for read or create .lnk files
-
-usage: pylnk3.py [p]arse / [c]reate ...
-
-Examples:
-pylnk3 p filename.lnk
-pylnk3 c c:\\prog.exe shortcut.lnk
-pylnk3 c \\\\192.168.1.1\\share\\file.doc doc.lnk
-pylnk3 create c:\\1.txt text.lnk -m Minimized -d "Description"
-
-for more info use help for each action (ex.: "pylnk3 create -h")
-        '''.strip())
+        print(HELP.strip())
         exit(1)
 
-    if args.action in ['create', 'c']:
+    if args.action in ('create', 'c'):
         for_file(
             args.target, args.name, arguments=args.arguments,
             description=args.description, icon_file=args.icon,
             icon_index=args.icon_index, work_dir=args.workdir,
             window_mode=args.mode,
         )
-    elif args.action in ['parse', 'p']:
+    elif args.action in ('parse', 'p'):
         lnk = parse(args.filename)
         props = args.props
         if len(props) == 0:
@@ -66,7 +69,7 @@ for more info use help for each action (ex.: "pylnk3 create -h")
         else:
             for prop in props:
                 print(get_prop(lnk, prop.split('.')))
-    elif args.action in ['d', 'duplicate']:
+    elif args.action in ('d', 'duplicate'):
         lnk = parse(args.filename)
         new_filename = args.new_filename
         print(lnk)

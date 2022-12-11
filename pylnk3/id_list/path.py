@@ -131,7 +131,7 @@ class PathSegmentEntry(IDListEntry):
         if self.type is None:
             raise MissingInformationException("Type is missing, choose either TYPE_FOLDER or TYPE_FILE.")
         if self.file_size is None:
-            if self.type.startswith('FOLDER') or self.type in ['KNOWN_FOLDER', 'ROOT_KNOWN_FOLDER']:
+            if self.type.startswith('FOLDER') or self.type in ('KNOWN_FOLDER', 'ROOT_KNOWN_FOLDER'):
                 self.file_size = 0
             else:
                 raise MissingInformationException("File size missing")
