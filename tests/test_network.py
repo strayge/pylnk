@@ -3,7 +3,7 @@ import os
 import pytest
 
 from pylnk3 import Lnk
-from pylnk3.extra_data import ExtraData_EnvironmentVariableDataBlock
+from pylnk3.structures import ExtraData_EnvironmentVariableDataBlock
 
 
 def check_path(lnk: Lnk, path: str) -> None:

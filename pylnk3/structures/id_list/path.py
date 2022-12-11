@@ -5,7 +5,7 @@ from io import BytesIO
 from typing import Optional
 
 from pylnk3.exceptions import MissingInformationException
-from pylnk3.id_list.base import IDListEntry
+from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.utils.guid import bytes_from_guid, guid_from_bytes
 from pylnk3.utils.read_write import (
     read_cstring, read_cunicode, read_dos_datetime, read_double, read_int, read_short,

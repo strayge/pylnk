@@ -2,7 +2,7 @@ import re
 from typing import Union
 
 from pylnk3.exceptions import FormatException
-from pylnk3.id_list.base import IDListEntry
+from pylnk3.structures import IDListEntry
 
 _DRIVE_PATTERN = re.compile(r'(\w)[:/\\]*$')
 

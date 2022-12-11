@@ -1,6 +1,6 @@
 from typing import Union
 
-from pylnk3.id_list.base import IDListEntry
+from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.utils.guid import guid_from_bytes
 
 ROOT_MY_COMPUTER = 'MY_COMPUTER'

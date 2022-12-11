@@ -2,15 +2,12 @@ import ntpath
 import re
 from typing import Any, Dict, Iterable, List, Optional, Union
 
-from pylnk3.extra_data import ExtraData, ExtraData_EnvironmentVariableDataBlock
-from pylnk3.id_list.base import IDListEntry
-from pylnk3.id_list.drive import DriveEntry
-from pylnk3.id_list.id_list import LinkTargetIDList
-from pylnk3.id_list.path import TYPE_FOLDER, PathSegmentEntry
-from pylnk3.id_list.root import ROOT_MY_COMPUTER, ROOT_UWP_APPS, RootEntry
-from pylnk3.id_list.uwp import UwpSegmentEntry
-from pylnk3.link_info import LinkInfo
-from pylnk3.lnk import Lnk
+from pylnk3.structures import (
+    DriveEntry, ExtraData, ExtraData_EnvironmentVariableDataBlock, IDListEntry, LinkInfo,
+    LinkTargetIDList, Lnk, PathSegmentEntry, RootEntry, UwpSegmentEntry,
+)
+from pylnk3.structures.id_list.path import TYPE_FOLDER
+from pylnk3.structures.id_list.root import ROOT_MY_COMPUTER, ROOT_UWP_APPS
 
 # def is_lnk(f: BytesIO) -> bool:
 #     if hasattr(f, 'name'):

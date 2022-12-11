@@ -3,10 +3,10 @@ from io import BufferedIOBase
 from typing import Optional, Union
 
 from pylnk3.exceptions import FormatException, InvalidKeyException
-from pylnk3.extra_data import ExtraData, ExtraData_EnvironmentVariableDataBlock
 from pylnk3.flags import Flags, ModifierKeys
-from pylnk3.id_list.id_list import LinkTargetIDList
-from pylnk3.link_info import DRIVE_UNKNOWN, LinkInfo
+from pylnk3.structures.extra_data import ExtraData, ExtraData_EnvironmentVariableDataBlock
+from pylnk3.structures.id_list.id_list import LinkTargetIDList
+from pylnk3.structures.link_info import DRIVE_UNKNOWN, LinkInfo
 from pylnk3.utils.data import convert_time_to_unix, convert_time_to_windows
 from pylnk3.utils.read_write import (
     read_byte, read_double, read_int, read_short, read_sized_string, write_byte, write_double,

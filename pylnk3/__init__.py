@@ -1,1 +1,1 @@
-from pylnk3.lnk import Lnk
+from pylnk3.structures import Lnk
