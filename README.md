@@ -76,6 +76,7 @@ pylnk3 create c:\1.txt text.lnk -m Minimized -d "Description"
 ## Changes
 
 **1.0.0a1**
+split single `pylnk3.py` to separated modules
 [FIX] fixed building links for non-existing locally paths (guessing target type by dot in name)
 added `--file` / `--directory` create command options to override target type guessing
 
