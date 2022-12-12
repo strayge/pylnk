@@ -4,6 +4,7 @@ from typing import Optional, Union
 
 from pylnk3.exceptions import FormatException, InvalidKeyException
 from pylnk3.flags import Flags, ModifierKeys
+from pylnk3.structures.base import Serializable
 from pylnk3.structures.extra_data import ExtraData, ExtraData_EnvironmentVariableDataBlock
 from pylnk3.structures.id_list.id_list import LinkTargetIDList
 from pylnk3.structures.link_info import DRIVE_UNKNOWN, LinkInfo
@@ -88,7 +89,7 @@ def assert_lnk_signature(f: BufferedIOBase) -> None:
         raise FormatException("Cannot read this kind of .lnk file.")
 
 
-class Lnk:
+class Lnk(Serializable):
 
     def __init__(self, f: Optional[Union[str, BufferedIOBase]] = None) -> None:
         self.file: Optional[str] = None
@@ -351,6 +352,26 @@ class Lnk:
         self._link_info.base_name = base_name
         self._link_info.remote = True
         self._link_info.make_path()
+
+    def json(self) -> dict:
+        return {
+            'description': self.description if self.link_flags.HasName else None,
+            'relative_path': self.relative_path if self.link_flags.HasRelativePath else None,
+            'work_dir': self.work_dir if self.link_flags.HasWorkingDir else None,
+            'arguments': self.arguments if self.link_flags.HasArguments else None,
+            'icon': self.icon if self.link_flags.HasIconLocation else None,
+            'window_mode': self._show_command,
+            'hotkey': self.hot_key,
+            'creation_time': self.creation_time.isoformat() if self.creation_time else None,
+            'modification_time': self.modification_time.isoformat() if self.modification_time else None,
+            'access_time': self.access_time.isoformat() if self.access_time else None,
+            'file_size': self.file_size,
+            'file_flags': self.file_flags.json(),
+            'link_info': self._link_info.json(),
+            'link_flags': self.link_flags.json(),
+            'shell_item_id_list': self.shell_item_id_list.json() if self.link_flags.HasLinkTargetIDList else None,
+            'extra_data': self.extra_data.json() if self.extra_data else None,
+        }
 
     def __str__(self) -> str:
         s = "Target file:\n"

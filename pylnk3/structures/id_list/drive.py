@@ -34,5 +34,11 @@ class DriveEntry(IDListEntry):
         #     drive = drive.encode()
         # return b'/' + drive + b'\\' + b'\x00' * 19
 
+    def json(self) -> dict:
+        return {
+            'class': 'DriveEntry',
+            'drive': self.drive.decode(),
+        }
+
     def __str__(self) -> str:
         return f"<DriveEntry: {self.drive!r}>"

@@ -224,5 +224,17 @@ class PathSegmentEntry(IDListEntry):
         write_short(offset_part2, out)
         return out.getvalue()
 
+    def json(self) -> dict:
+        return {
+            'class': 'PathSegmentEntry',
+            'type': self.type,
+            'file_size': self.file_size,
+            'modified': self.modified.isoformat() if self.modified else None,
+            'created': self.created.isoformat() if self.created else None,
+            'accessed': self.accessed.isoformat() if self.accessed else None,
+            'short_name': self.short_name,
+            'full_name': self.full_name,
+        }
+
     def __str__(self) -> str:
         return "<PathSegmentEntry: %s>" % self.full_name

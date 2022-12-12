@@ -2,6 +2,7 @@ from io import BufferedIOBase
 from typing import Optional
 
 from pylnk3.exceptions import MissingInformationException
+from pylnk3.structures.base import Serializable
 from pylnk3.utils.read_write import read_cstring, read_int, write_byte, write_cstring, write_int
 
 DRIVE_NO_ROOT_DIR = "No root directory"
@@ -27,7 +28,7 @@ _LINK_INFO_HEADER_DEFAULT = 0x1C
 _LINK_INFO_HEADER_OPTIONAL = 0x24
 
 
-class LinkInfo:
+class LinkInfo(Serializable):
 
     def __init__(self, lnk: Optional[BufferedIOBase] = None) -> None:
         if lnk is not None:
@@ -145,6 +146,17 @@ class LinkInfo:
     @property
     def path(self) -> str:
         return self._path
+
+    def json(self) -> dict:
+        return {
+            "remote": bool(self.remote),
+            "network_share_name": self.network_share_name if self.remote else None,
+            "base_name": self.base_name if self.remote else None,
+            "drive_type": self.drive_type if not self.remote else None,
+            "drive_serial": self.drive_serial if not self.remote else None,
+            "volume_label": self.volume_label if not self.remote else None,
+            "local_base_path": self.local_base_path if not self.remote else None,
+        }
 
     def __str__(self) -> str:
         s = "File Location Info:"

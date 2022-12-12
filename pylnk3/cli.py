@@ -1,4 +1,5 @@
 import argparse
+import json
 from typing import Any, List
 
 from pylnk3.helpers import for_file, parse
@@ -34,6 +35,7 @@ def main() -> None:
     parser_parse = subparsers.add_parser('parse', aliases=['p'], help='read lnk file')
     parser_parse.add_argument('filename', help='lnk filename to read')
     parser_parse.add_argument('props', nargs='*', help='props path to read')
+    parser_parse.add_argument('--json', '-j', action='store_true', help='output as json')
 
     parser_create = subparsers.add_parser('create', aliases=['c'], help='create new lnk file')
     parser_create.add_argument('target', help='target path')
@@ -75,7 +77,7 @@ def main() -> None:
         lnk = parse(args.filename)
         props = args.props
         if len(props) == 0:
-            print(lnk)
+            print(json.dumps(lnk.json(), indent=4) if args.json else lnk.text())
         else:
             for prop in props:
                 print(get_prop(lnk, prop.split('.')))

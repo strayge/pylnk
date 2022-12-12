@@ -61,5 +61,12 @@ class RootEntry(IDListEntry):
             + b''.join(chars[8:])
         )
 
+    def json(self) -> dict:
+        return {
+            'class': 'RootEntry',
+            'root': self.root,
+            'guid': self.guid,
+        }
+
     def __str__(self) -> str:
         return "<RootEntry: %s>" % self.root

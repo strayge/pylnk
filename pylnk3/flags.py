@@ -1,10 +1,12 @@
 from pprint import pformat
 from typing import Any, Dict, Tuple
 
+from pylnk3.structures.base import Serializable
+
 _MODIFIER_KEYS = ('SHIFT', 'CONTROL', 'ALT')
 
 
-class Flags:
+class Flags(Serializable):
 
     def __init__(self, flag_names: Tuple[str, ...], flags_bytes: int = 0) -> None:
         self._flag_names = flag_names
@@ -45,6 +47,9 @@ class Flags:
 
     def __str__(self) -> str:
         return pformat(self._flags, indent=2)
+
+    def json(self) -> dict:
+        return self._flags
 
 
 class ModifierKeys(Flags):

@@ -1,6 +1,7 @@
 from io import BytesIO
 from typing import List, Optional
 
+from pylnk3.structures.base import Serializable
 from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.structures.id_list.drive import DriveEntry
 from pylnk3.structures.id_list.path import PathSegmentEntry
@@ -9,7 +10,7 @@ from pylnk3.structures.id_list.uwp import UwpSegmentEntry
 from pylnk3.utils.read_write import read_short, write_short
 
 
-class LinkTargetIDList:
+class LinkTargetIDList(Serializable):
 
     def __init__(self, bytes: Optional[bytes] = None) -> None:
         self.items: List[IDListEntry] = []
@@ -91,6 +92,11 @@ class LinkTargetIDList:
             out.write(bytes)
         out.write(b'\x00\x00')
         return out.getvalue()
+
+    def json(self) -> dict:
+        return {
+            'items': [item.json() for item in self.items],
+        }
 
     def __str__(self) -> str:
         string = '<LinkTargetIDList>:\n'

@@ -1,7 +1,9 @@
+from binascii import hexlify
 from io import BufferedIOBase, BytesIO
 from struct import unpack
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
+from pylnk3.structures.base import Serializable
 from pylnk3.utils.data import convert_time_to_unix
 from pylnk3.utils.guid import guid_to_str
 from pylnk3.utils.padding import padding
@@ -46,11 +48,12 @@ class TypedPropertyValue:
         buf.write(self.value)
         return buf.getvalue()
 
-    def __str__(self) -> str:
+    @property
+    def value_decoded(self) -> str:
         value = self.value
         if self.type == 0x1F:
             size = value[:4]
-            value_str = value[4:].decode('utf-16-le')
+            value_str = value[4:].decode('utf-16-le').rstrip('\u0000')
         elif self.type == 0x15:
             value_str = unpack('<Q', value)[0]
         elif self.type == 0x13:
@@ -69,13 +72,23 @@ class TypedPropertyValue:
             low = read_int(stream)
             high = read_int(stream)
             num = (high << 32) + low
-            value_str = str(convert_time_to_unix(num))
+            value_str = convert_time_to_unix(num).isoformat()
         else:
             value_str = str(value)
-        return f'{hex(self.type)}: {value_str!s}'
+        return value_str
+
+    def json(self) -> dict:
+        return {
+            'type': self.type,
+            'value': hexlify(self.value).decode(),
+            'value_decoded': self.value_decoded,
+        }
+
+    def __str__(self) -> str:
+        return f'{hex(self.type)}: {self.value_decoded!s}'
 
 
-class PropertyStore:
+class PropertyStore(Serializable):
     def __init__(
         self,
         bytes: Optional[BytesIO] = None,
@@ -156,6 +169,12 @@ class PropertyStore:
 
         return buf.getvalue()
 
+    def json(self) -> dict:
+        return {
+            'format_id': guid_to_str(self.format_id),
+            'properties': {name: value.json() for name, value in self.properties},
+        }
+
     def __str__(self) -> str:
         s = ' PropertyStore'
         s += '\n  FormatID: %s' % guid_to_str(self.format_id)
@@ -164,7 +183,7 @@ class PropertyStore:
         return s.strip()
 
 
-class ExtraData_DataBlock:
+class ExtraData_DataBlock(Serializable):
     def __init__(self, bytes: Optional[bytes] = None, **kwargs: Any) -> None:
         raise NotImplementedError
 
@@ -201,6 +220,13 @@ class ExtraData_IconEnvironmentDataBlock(ExtraData_DataBlock):
         buf.write(target_ansi)
         buf.write(target_unicode)
         return buf.getvalue()
+
+    def json(self) -> dict:
+        return {
+            'class': 'IconEnvironmentDataBlock',
+            'target_ansi': self.target_ansi,
+            'target_unicode': self.target_unicode,
+        }
 
     def __str__(self) -> str:
         target_ansi = self.target_ansi.replace('\x00', '')
@@ -254,6 +280,13 @@ class ExtraData_Unparsed(ExtraData_DataBlock):
         buf.write(self.data)
         return buf.getvalue()
 
+    def json(self) -> dict:
+        return {
+            'class': 'Unparsed',
+            'signature': hex(self._signature),
+            'data': hexlify(self.data).decode(),
+        }
+
     def __str__(self) -> str:
         s = f'ExtraDataBlock\n signature {hex(self._signature)}\n data: {self.data!r}'
         return s
@@ -300,6 +333,12 @@ class ExtraData_PropertyStoreDataBlock(ExtraData_DataBlock):
         write_int(0x00000000, buf)
         return buf.getvalue()
 
+    def json(self) -> dict:
+        return {
+            'class': 'PropertyStoreDataBlock',
+            'stores': [prop_store.json() for prop_store in self.stores],
+        }
+
     def __str__(self) -> str:
         s = 'PropertyStoreDataBlock'
         for prop_store in self.stores:
@@ -317,8 +356,8 @@ class ExtraData_EnvironmentVariableDataBlock(ExtraData_DataBlock):
 
     def read(self, bytes: bytes) -> None:
         buf = BytesIO(bytes)
-        self.target_ansi = buf.read(260).decode()
-        self.target_unicode = buf.read(520).decode('utf-16-le')
+        self.target_ansi = buf.read(260).decode().rstrip('\u0000')
+        self.target_unicode = buf.read(520).decode('utf-16-le').rstrip('\u0000')
 
     def bytes(self) -> bytes:
         target_ansi = padding(self.target_ansi.encode(), 260)
@@ -332,6 +371,13 @@ class ExtraData_EnvironmentVariableDataBlock(ExtraData_DataBlock):
         buf.write(target_ansi)
         buf.write(target_unicode)
         return buf.getvalue()
+
+    def json(self) -> dict:
+        return {
+            'class': 'EnvironmentVariableDataBlock',
+            'target_ansi': self.target_ansi,
+            'target_unicode': self.target_unicode,
+        }
 
     def __str__(self) -> str:
         target_ansi = self.target_ansi.replace('\x00', '')
@@ -347,7 +393,7 @@ EXTRA_DATA_TYPES_CLASSES: Dict[str, Type[ExtraData_DataBlock]] = {
 }
 
 
-class ExtraData:
+class ExtraData(Serializable):
     # EXTRA_DATA = *EXTRA_DATA_BLOCK TERMINAL_BLOCK
     def __init__(self, lnk: Optional[BufferedIOBase] = None, blocks: Optional[List[ExtraData_DataBlock]] = None) -> None:
         self.blocks = []
@@ -378,6 +424,9 @@ class ExtraData:
             result += block.bytes()
         result += b'\x00\x00\x00\x00'  # TerminalBlock
         return result
+
+    def json(self) -> Union[dict, list]:
+        return [block.json() for block in self.blocks]
 
     def __str__(self) -> str:
         s = ''

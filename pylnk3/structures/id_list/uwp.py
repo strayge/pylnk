@@ -1,6 +1,8 @@
+from binascii import hexlify
 from io import BytesIO
 from typing import List, Optional, Union
 
+from pylnk3.structures.base import Serializable
 from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.utils.guid import bytes_from_guid, guid_from_bytes
 from pylnk3.utils.read_write import (
@@ -9,7 +11,7 @@ from pylnk3.utils.read_write import (
 )
 
 
-class UwpSubBlock:
+class UwpSubBlock(Serializable):
 
     block_names = {
         0x11: 'PackageFamilyName',
@@ -64,6 +66,14 @@ class UwpSubBlock:
                 string_len = read_int(buf)
                 self.value = read_cunicode(buf)
 
+    def json(self) -> dict:
+        return {
+            'type': self.type,
+            'name': self.name,
+            'value': hexlify(self.value).decode() if isinstance(self.value, bytes) else None,
+            'value_decoded': self.value if isinstance(self.value, str) else None,
+        }
+
     def __str__(self) -> str:
         string = f'UwpSubBlock {self.name} ({hex(self.type)}): {self.value!r}'
         return string.strip()
@@ -92,7 +102,7 @@ class UwpSubBlock:
         return result
 
 
-class UwpMainBlock:
+class UwpMainBlock(Serializable):
     magic = b'\x31\x53\x50\x53'
 
     def __init__(
@@ -117,6 +127,13 @@ class UwpMainBlock:
                 break
             sub_block_data = buf.read(sub_block_size - 4)  # includes block_size
             self._blocks.append(UwpSubBlock(sub_block_data))
+
+    def json(self) -> dict:
+        return {
+            'class': 'UwpMainBlock',
+            'guid': self.guid,
+            'blocks': [block.json() for block in self._blocks],
+        }
 
     def __str__(self) -> str:
         string = f'<UwpMainBlock> {self.guid}:\n'
@@ -160,6 +177,12 @@ class UwpSegmentEntry(IDListEntry):
                 break
             block_data = buf.read(block_size - 4)  # includes block_size
             self._blocks.append(UwpMainBlock(block_data))
+
+    def json(self) -> dict:
+        return {
+            'entry': 'UwpSegmentEntry',
+            'blocks': [block.json() for block in self._blocks],
+        }
 
     def __str__(self) -> str:
         string = '<UwpSegmentEntry>:\n'

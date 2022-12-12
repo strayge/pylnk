@@ -34,6 +34,7 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
+  --json, -j  output as json
 ```
 
 #### Create new lnk file
