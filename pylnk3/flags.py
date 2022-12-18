@@ -4,6 +4,43 @@ from typing import Any, Dict, Tuple
 from pylnk3.structures.base import Serializable
 
 _MODIFIER_KEYS = ('SHIFT', 'CONTROL', 'ALT')
+_LINK_FLAGS = (
+    'HasLinkTargetIDList',
+    'HasLinkInfo',
+    'HasName',
+    'HasRelativePath',
+    'HasWorkingDir',
+    'HasArguments',
+    'HasIconLocation',
+    'IsUnicode',
+    'ForceNoLinkInfo',
+    # new
+    'HasExpString',
+    'RunInSeparateProcess',
+    'Unused1',
+    'HasDarwinID',
+    'RunAsUser',
+    'HasExpIcon',
+    'NoPidlAlias',
+    'Unused2',
+    'RunWithShimLayer',
+    'ForceNoLinkTrack',
+    'EnableTargetMetadata',
+    'DisableLinkPathTracking',
+    'DisableKnownFolderTracking',
+    'DisableKnownFolderAlias',
+    'AllowLinkToLink',
+    'UnaliasOnSave',
+    'PreferEnvironmentPath',
+    'KeepLocalIDListForUNCTarget',
+)
+_FILE_ATTRIBUTES_FLAGS = (
+    'read_only', 'hidden', 'system_file', 'reserved1',
+    'directory', 'archive', 'reserved2', 'normal',
+    'temporary', 'sparse_file', 'reparse_point',
+    'compressed', 'offline', 'not_content_indexed',
+    'encrypted',
+)
 
 
 class Flags(Serializable):
@@ -63,3 +100,13 @@ class ModifierKeys(Flags):
         s += self.SHIFT and "SHIFT+" or ""
         s += self.ALT and "ALT+" or ""
         return s
+
+
+class LinkFlags(Flags):
+    def __init__(self, flags_bytes: int = 0) -> None:
+        Flags.__init__(self, _LINK_FLAGS, flags_bytes)
+
+
+class FileFlags(Flags):
+    def __init__(self, flags_bytes: int = 0) -> None:
+        Flags.__init__(self, _FILE_ATTRIBUTES_FLAGS, flags_bytes)

@@ -3,7 +3,7 @@ from io import BufferedIOBase
 from typing import Optional, Union
 
 from pylnk3.exceptions import FormatException, InvalidKeyException
-from pylnk3.flags import Flags, ModifierKeys
+from pylnk3.flags import FileFlags, LinkFlags, ModifierKeys
 from pylnk3.structures.base import Serializable
 from pylnk3.structures.extra_data import ExtraData, ExtraData_EnvironmentVariableDataBlock
 from pylnk3.structures.id_list.id_list import LinkTargetIDList
@@ -16,45 +16,6 @@ from pylnk3.utils.read_write import (
 
 _SIGNATURE = b'L\x00\x00\x00'
 _GUID = b'\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'
-
-_LINK_FLAGS = (
-    'HasLinkTargetIDList',
-    'HasLinkInfo',
-    'HasName',
-    'HasRelativePath',
-    'HasWorkingDir',
-    'HasArguments',
-    'HasIconLocation',
-    'IsUnicode',
-    'ForceNoLinkInfo',
-    # new
-    'HasExpString',
-    'RunInSeparateProcess',
-    'Unused1',
-    'HasDarwinID',
-    'RunAsUser',
-    'HasExpIcon',
-    'NoPidlAlias',
-    'Unused2',
-    'RunWithShimLayer',
-    'ForceNoLinkTrack',
-    'EnableTargetMetadata',
-    'DisableLinkPathTracking',
-    'DisableKnownFolderTracking',
-    'DisableKnownFolderAlias',
-    'AllowLinkToLink',
-    'UnaliasOnSave',
-    'PreferEnvironmentPath',
-    'KeepLocalIDListForUNCTarget',
-)
-
-_FILE_ATTRIBUTES_FLAGS = (
-    'read_only', 'hidden', 'system_file', 'reserved1',
-    'directory', 'archive', 'reserved2', 'normal',
-    'temporary', 'sparse_file', 'reparse_point',
-    'compressed', 'offline', 'not_content_indexed',
-    'encrypted',
-)
 
 WINDOW_NORMAL = "Normal"
 WINDOW_MAXIMIZED = "Maximized"
@@ -101,8 +62,8 @@ class Lnk(Serializable):
                 self.file += ".lnk"
                 f = open(self.file, 'rb')
         # defaults
-        self.link_flags = Flags(_LINK_FLAGS)
-        self.file_flags = Flags(_FILE_ATTRIBUTES_FLAGS)
+        self.link_flags = LinkFlags()
+        self.file_flags = FileFlags()
         self.creation_time = datetime.now()
         self.access_time = datetime.now()
         self.modification_time = datetime.now()
