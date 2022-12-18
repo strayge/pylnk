@@ -32,12 +32,12 @@ def check_extra_env_path(lnk: Lnk, path: str) -> None:
 def test_network_lnk(examples_path: str, temp_filename: str, filename: str, path: str) -> None:
     full_filename = os.path.join(examples_path, filename)
     # read
-    lnk = Lnk(full_filename)
+    lnk = Lnk.from_file(full_filename)
     check_path(lnk, path)
     check_extra_env_path(lnk, path)
     # write
     lnk.save(temp_filename)
     # check
-    lnk2 = Lnk(temp_filename)
+    lnk2 = Lnk.from_file(temp_filename)
     # check_path(lnk2, path)  # FIXME: something wrong with lnk.link_info.base_name
     check_extra_env_path(lnk2, path)

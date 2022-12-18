@@ -39,13 +39,13 @@ def is_drive(data: Union[str, Any]) -> bool:
 
 
 def parse(lnk: str) -> Lnk:
-    return Lnk(lnk)
+    return Lnk.from_file(lnk)
 
 
 def create(f: Optional[str] = None) -> Lnk:
-    lnk = Lnk()
-    lnk.file = f
-    return lnk
+    if f is None:
+        return Lnk.from_file(f)
+    return Lnk()
 
 
 def for_file(
@@ -108,7 +108,7 @@ def for_file(
     if window_mode:
         lnk.window_mode = window_mode
     if lnk_name:
-        lnk.save()
+        lnk.save(lnk_name)
     return lnk
 
 
@@ -211,6 +211,5 @@ def build_uwp(
     lnk.shell_item_id_list.items = elements
 
     if lnk_name:
-        lnk.file = lnk_name
-        lnk.save()
+        lnk.save(lnk_name)
     return lnk

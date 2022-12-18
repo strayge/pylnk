@@ -1,5 +1,6 @@
+import os
 from datetime import datetime
-from io import BufferedIOBase
+from io import BufferedIOBase, BufferedReader, BytesIO
 from typing import Optional, Union
 
 from pylnk3.exceptions import FormatException, InvalidKeyException
@@ -52,16 +53,7 @@ def assert_lnk_signature(f: BufferedIOBase) -> None:
 
 class Lnk(Serializable):
 
-    def __init__(self, f: Optional[Union[str, BufferedIOBase]] = None) -> None:
-        self.file: Optional[str] = None
-        if isinstance(f, str):
-            self.file = f
-            try:
-                f = open(self.file, 'rb')
-            except IOError:
-                self.file += ".lnk"
-                f = open(self.file, 'rb')
-        # defaults
+    def __init__(self) -> None:
         self.link_flags = LinkFlags()
         self.file_flags = FileFlags()
         self.creation_time = datetime.now()
@@ -78,10 +70,6 @@ class Lnk(Serializable):
         self.arguments = None
         self.icon = None
         self.extra_data: Optional[ExtraData] = None
-        if f is not None:
-            assert_lnk_signature(f)
-            self._parse_lnk_file(f)
-            f.close()
 
     def _read_hot_key(self, lnk: BufferedIOBase) -> str:
         low = read_byte(lnk)
@@ -149,7 +137,6 @@ class Lnk(Serializable):
         self.extra_data = ExtraData(lnk)
 
     def save(self, f: Optional[Union[str, BufferedIOBase]] = None, force_ext: bool = False) -> None:
-        f = f or self.file
         is_opened_here = False
         if isinstance(f, str):
             filename: str = f
@@ -314,6 +301,19 @@ class Lnk(Serializable):
         self._link_info.remote = True
         self._link_info.make_path()
 
+    @classmethod
+    def from_bytes(cls, data: bytes) -> 'Lnk':
+        f = BytesIO(data)
+        assert_lnk_signature(f)
+        lnk = cls()
+        lnk._parse_lnk_file(f)
+        return lnk
+
+    def bytes(self) -> bytes:
+        lnk = BytesIO()
+        self.write(lnk)
+        return lnk.getvalue()
+
     def json(self) -> dict:
         return {
             'description': self.description if self.link_flags.HasName else None,
@@ -333,6 +333,22 @@ class Lnk(Serializable):
             'shell_item_id_list': self.shell_item_id_list.json() if self.link_flags.HasLinkTargetIDList else None,
             'extra_data': self.extra_data.json() if self.extra_data else None,
         }
+
+    @classmethod
+    def from_file(
+        cls,
+        filename: Optional[str] = None,
+        file: Optional[BufferedReader] = None,
+    ) -> 'Lnk':
+        """Create Lnk object from file (by filename or file-like object)."""
+        if filename:
+            if not os.path.exists(filename):
+                filename += ".lnk"
+            with open(filename, 'rb') as f:
+                return cls.from_bytes(f.read())
+        elif file:
+            return cls.from_bytes(file.read())
+        raise ValueError("Either filename or file must be specified")
 
     def __str__(self) -> str:
         s = "Target file:\n"

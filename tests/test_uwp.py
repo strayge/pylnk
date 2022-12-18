@@ -18,7 +18,7 @@ def get_sub_blocks(lnk: Lnk) -> dict:
 def test_uwp_read(examples_path: str) -> None:
     full_filename = os.path.join(examples_path, 'uwp_calc.lnk')
 
-    lnk = Lnk(full_filename)
+    lnk = Lnk.from_file(full_filename)
     uwp_root = lnk.shell_item_id_list.items[0]
     assert uwp_root.root == ROOT_UWP_APPS
 
@@ -33,9 +33,9 @@ def test_uwp_read(examples_path: str) -> None:
 def test_uwp_write(examples_path: str, temp_filename: str) -> None:
     full_filename = os.path.join(examples_path, 'uwp_calc.lnk')
 
-    lnk = Lnk(full_filename)
+    lnk = Lnk.from_file(full_filename)
     lnk.save(temp_filename)
-    lnk2 = Lnk(temp_filename)
+    lnk2 = Lnk.from_file(temp_filename)
 
     uwp_root = lnk2.shell_item_id_list.items[0]
     assert uwp_root.root == ROOT_UWP_APPS
