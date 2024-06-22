@@ -118,7 +118,7 @@ class PathSegmentEntry(IDListEntry):
             entry.accessed = datetime.fromtimestamp(st.st_atime)
             if is_file is None:
                 is_file = not os.path.isdir(path)
-        except FileNotFoundError:
+        except OSError:  # ex.: not found or path too long
             now = datetime.now()
             entry.file_size = 0
             entry.modified = now
