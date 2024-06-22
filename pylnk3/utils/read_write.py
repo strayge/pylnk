@@ -104,12 +104,14 @@ def write_cunicode(val: str, buf: BufferedIOBase) -> None:
 
 
 def write_sized_string(val: str, buf: BufferedIOBase, string: bool = True) -> None:
-    size = len(val)
-    write_short(size, buf)
     if string:
-        buf.write(val.encode('utf-16-le'))
+        encoded_val = val.encode('utf-16-le')
+        size = len(encoded_val) // 2
     else:
-        buf.write(val.encode())
+        encoded_val = val.encode()
+        size = len(val)
+    write_short(size, buf)
+    buf.write(encoded_val)
 
 
 def put_bits(bits: int, target: int, start: int, count: int, length: int = 16) -> int:

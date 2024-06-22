@@ -92,3 +92,13 @@ def test_empty_idlist(examples_path: str, temp_filename: str) -> None:
     lnk.save(temp_filename)
     lnk2 = Lnk.from_file(temp_filename)
     assert lnk2.path == path
+
+
+def test_local_emoji(examples_path: str, temp_filename: str) -> None:
+    filename = os.path.join(examples_path, 'local_emoji.lnk')
+    path = 'C:\\Users\\Public\\Downloads\\test❤️and🍰.txt'
+    lnk = Lnk.from_file(filename)
+    assert lnk.path == path
+    lnk.save(temp_filename)
+    lnk2 = Lnk.from_file(temp_filename)
+    assert lnk2.path == path
