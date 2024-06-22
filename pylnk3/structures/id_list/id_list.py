@@ -57,11 +57,11 @@ class LinkTargetIDList(Serializable):
     def get_path(self) -> str:
         segments: List[str] = []
         for item in self.items:
-            if type(item) == RootEntry:
+            if isinstance(item, RootEntry):
                 segments.append('%' + item.root + '%')
-            elif type(item) == DriveEntry:
+            elif isinstance(item, DriveEntry):
                 segments.append(item.drive.decode())
-            elif type(item) == PathSegmentEntry:
+            elif isinstance(item, PathSegmentEntry):
                 if item.full_name is not None:
                     segments.append(item.full_name)
             else:

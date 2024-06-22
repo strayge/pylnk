@@ -262,7 +262,7 @@ class Lnk(Serializable):
         env_var_path = None
         if self.extra_data and self.extra_data.blocks:
             for block in self.extra_data.blocks:
-                if type(block) == ExtraData_EnvironmentVariableDataBlock:
+                if isinstance(block, ExtraData_EnvironmentVariableDataBlock):
                     env_var_path = block.target_unicode.strip('\x00') or block.target_ansi.strip('\x00')
                     break
 
