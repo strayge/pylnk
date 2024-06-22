@@ -3,6 +3,7 @@ import os
 import pytest
 
 from pylnk3 import Lnk
+from pylnk3.structures.extra_data import ExtraData_Unparsed
 
 
 @pytest.mark.parametrize(
@@ -112,3 +113,14 @@ def test_local_thispc(examples_path: str, temp_filename: str) -> None:
     lnk.save(temp_filename)
     lnk2 = Lnk.from_file(temp_filename)
     assert lnk2.path == path
+
+
+def test_local_unknown_extra(examples_path: str, temp_filename: str) -> None:
+    filename = os.path.join(examples_path, 'local_extra_0xa2000001.lnk')
+    lnk = Lnk.from_file(filename)
+    lnk.save(temp_filename)
+    lnk2 = Lnk.from_file(temp_filename)
+    assert lnk2.extra_data
+    extra_block = lnk2.extra_data.blocks[0]
+    assert isinstance(extra_block, ExtraData_Unparsed)
+    assert extra_block._signature == 0xA2000001

@@ -408,7 +408,7 @@ class ExtraData(Serializable):
             signature = read_int(lnk)
             bytes = lnk.read(size - 8)
             # lnk.seek(-8, 1)
-            block_type = EXTRA_DATA_TYPES[signature]
+            block_type = EXTRA_DATA_TYPES.get(signature)
             if block_type in EXTRA_DATA_TYPES_CLASSES:
                 block_class = EXTRA_DATA_TYPES_CLASSES[block_type]
                 block = block_class(bytes=bytes)
