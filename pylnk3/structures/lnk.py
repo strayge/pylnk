@@ -268,6 +268,9 @@ class Lnk(Serializable):
 
         if id_list_path and id_list_path.startswith('%MY_COMPUTER%'):
             # full local path has priority
+            if len(id_list_path) == 13:
+                # show "My Computer" only if it's the only path
+                return id_list_path
             return id_list_path[14:]
         if id_list_path and id_list_path.startswith('%USERPROFILE%\\::'):
             # path to KNOWN_FOLDER also has priority over link_info

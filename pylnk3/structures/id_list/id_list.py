@@ -30,7 +30,9 @@ class LinkTargetIDList(Serializable):
             root_entry = RootEntry(raw[0])
             self.items.append(root_entry)
             if root_entry.root == ROOT_MY_COMPUTER:
-                if len(raw[1]) == 0x17:
+                if len(raw) == 1:
+                    pass
+                elif len(raw[1]) == 0x17:
                     self.items.append(DriveEntry(raw[1]))
                 elif raw[1][0:2] == b'\x2E\x80':  # ROOT_KNOWN_FOLDER
                     self.items.append(PathSegmentEntry(raw[1]))
@@ -71,6 +73,8 @@ class LinkTargetIDList(Serializable):
             return
         root_entry = self.items[0]
         if isinstance(root_entry, RootEntry) and root_entry.root == ROOT_MY_COMPUTER:
+            if len(self.items) == 1:
+                return
             second_entry = self.items[1]
             if isinstance(second_entry, DriveEntry):
                 return
