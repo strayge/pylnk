@@ -79,6 +79,13 @@ pylnk3 create 'c:\\dir\\file.txt' text.lnk -m Minimized -d "Description"
 
 ## Changes
 
+**dev**
+add `--json` format for `parse` command
+`Lnk` class now has separated constructors `Lnk.from_bytes()` and `Lnk.from_file()`
+[FIX] strings with 2-bytes unicode characters now correctly written on save
+[FIX] allow read/write links with only `This PC` part in target
+[FIX] allow read completely unknown `ExtraData` blocks
+
 **1.0.0a1**  
 split single `pylnk3.py` to separated modules  
 [FIX] fixed building links for non-existing locally paths (guessing target type by dot in name)  
