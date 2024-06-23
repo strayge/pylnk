@@ -161,22 +161,39 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         write_short(type_and_flags, out)
         write_int(self.file_size, out)
         write_dos_datetime(self.modified, out)
-        write_short(0x10, out)  # observation: can be 0x11
+        write_short(0x10, out)
         if self.flags.IsUnicode:
             write_cunicode(self.short_name, out)
         else:
             write_cstring(self.short_name, out, padding=True)
-        indicator = 24 + 2 * len(self.short_name)
-        write_short(indicator, out)  # size
-        write_short(0x03, out)  # version
-        write_short(0x04, out)  # signature part1
-        write_short(0xBeef, out)  # signature part2
+
+        version = 3  # just hardcode some version
+        # structures below compatible with versions 3 and 9 in case someone needs it
+
+        # offset from start of size field until start of full_name
+        if version == 9:
+            offset_unicode = 0x2E
+        elif version == 3:
+            offset_unicode = 0x14
+        else:
+            raise NotImplementedError("Other versions not implemented yet")
+
+        size = offset_unicode + 2 * (len(self.full_name) + 2) + 2  # full struct size
+        write_short(size, out)  # size
+        write_short(version, out)  # version
+        write_int(0xBEEF0004, out)  # signature
         write_dos_datetime(self.created, out)
         write_dos_datetime(self.accessed, out)
-        offset_unicode = 0x14  # fixed data structure, always the same
         write_short(offset_unicode, out)
+        if version >= 9:
+            write_short(0, out)  # offset_ansi
+            write_double(0, out)  # file_reference
+            write_double(0, out)  # unknown2
         offset_ansi = 0  # we always write unicode
         write_short(offset_ansi, out)  # long_string_size
+        if version >= 9:
+            write_int(0, out)  # unknown4
+            write_int(0, out)  # unknown5
         write_cunicode(self.full_name, out)
         offset_part2 = 0x0E + short_name_len
         write_short(offset_part2, out)
