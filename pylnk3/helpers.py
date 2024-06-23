@@ -4,9 +4,8 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from pylnk3.structures import (
     DriveEntry, ExtraData, ExtraData_EnvironmentVariableDataBlock, IDListEntry, LinkInfo,
-    LinkTargetIDList, Lnk, PathSegmentEntry, RootEntry, UwpSegmentEntry,
+    LinkTargetIDList, Lnk, PathSegmentFileOrFolderEntry, RootEntry, UwpSegmentEntry,
 )
-from pylnk3.structures.id_list.path import TYPE_FOLDER
 from pylnk3.structures.id_list.root import ROOT_MY_COMPUTER, ROOT_UWP_APPS
 
 # def is_lnk(f: BytesIO) -> bool:
@@ -87,7 +86,7 @@ def for_file(
         for level in levels[1:]:
             is_last_level = level == levels[-1]
             # consider all segments before last as directory
-            segment = PathSegmentEntry.create_for_path(level, is_file=is_file if is_last_level else False)
+            segment = PathSegmentFileOrFolderEntry.create_for_path(level, is_file=is_file if is_last_level else False)
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
@@ -157,9 +156,8 @@ def from_segment_list(
         entries.append(DriveEntry(drive))
     data_without_root: List[Dict[str, Any]] = data  # type: ignore
     for level in data_without_root:
-        segment = PathSegmentEntry()
-        segment.type = level['type']
-        if level['type'] == TYPE_FOLDER:
+        segment = PathSegmentFileOrFolderEntry()
+        if level['type'] == 'TYPE_FOLDER':
             segment.file_size = 0
         else:
             segment.file_size = level['size']
@@ -171,7 +169,7 @@ def from_segment_list(
         entries.append(segment)
     lnk.shell_item_id_list = LinkTargetIDList()
     lnk.shell_item_id_list.items = entries
-    if data_without_root[-1]['type'] == TYPE_FOLDER:
+    if data_without_root[-1]['type'] == 'TYPE_FOLDER':
         lnk.file_flags.directory = True
     if lnk_name:
         lnk.save(lnk_name)

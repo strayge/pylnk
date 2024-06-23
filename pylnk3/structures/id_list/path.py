@@ -1,10 +1,12 @@
 import ntpath
 import os
+from binascii import hexlify
 from datetime import datetime
 from io import BytesIO
 from typing import Optional
 
 from pylnk3.exceptions import MissingInformationException
+from pylnk3.flags import Flags
 from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.utils.guid import bytes_from_guid, guid_from_bytes
 from pylnk3.utils.read_write import (
@@ -14,10 +16,7 @@ from pylnk3.utils.read_write import (
 
 _ENTRY_TYPES = {
     0x00: 'KNOWN_FOLDER',
-    0x31: 'FOLDER',
-    0x32: 'FILE',
-    0x35: 'FOLDER (UNICODE)',
-    0x36: 'FILE (UNICODE)',
+    0x30: 'FILE_OR_FOLDER',  # all 0x3x variations
     0x802E: 'ROOT_KNOWN_FOLDER',
     # founded in doc, not tested
     0x1f: 'ROOT_FOLDER',
@@ -26,52 +25,82 @@ _ENTRY_TYPES = {
 }
 _ENTRY_TYPE_IDS = dict((v, k) for k, v in _ENTRY_TYPES.items())
 
-TYPE_FOLDER = 'FOLDER'
-TYPE_FILE = 'FILE'
+_FILE_OR_FOLDER_ENTRY_FLAGS = (
+    'IsDirectory',
+    'IsFile',
+    'IsUnicode',
+)
+
+
+class FileOrFolderEntryFlags(Flags):
+    def __init__(self, flags_bytes: int = 0) -> None:
+        super().__init__(_FILE_OR_FOLDER_ENTRY_FLAGS, flags_bytes)
 
 
 class PathSegmentEntry(IDListEntry):
-
     def __init__(self, bytes: Optional[bytes] = None) -> None:
-        self.type = None
+        if bytes is None:
+            return
+
+        self.raw = bytes
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> 'PathSegmentEntry':
+        first_word: int = int.from_bytes(data[0:2], byteorder='little')
+        if (first_word & 0xFFFF0) == _ENTRY_TYPE_IDS['FILE_OR_FOLDER']:
+            return PathSegmentFileOrFolderEntry(data)
+        if first_word == _ENTRY_TYPE_IDS['KNOWN_FOLDER']:
+            return PathSegmentKnownFolderEntry(data)
+        if first_word == _ENTRY_TYPE_IDS['ROOT_KNOWN_FOLDER']:
+            return PathSegmentRootKnownFolderEntry(data)
+        return cls(data)
+
+    @property
+    def path(self) -> str:
+        return '<UNKNOWN>'
+
+    @property
+    def bytes(self) -> bytes:
+        return self.raw
+
+    def __str__(self) -> str:
+        return "<PathSegmentEntry: %s>" % str(self.raw)
+
+    def json(self) -> dict:
+        return {
+            'class': 'PathSegmentEntry',
+            'raw': hexlify(self.raw).decode(),
+        }
+
+
+class PathSegmentFileOrFolderEntry(PathSegmentEntry):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
+        self.type = 'FILE_OR_FOLDER'
+        self.flags = FileOrFolderEntryFlags()
+
         self.file_size = None
         self.modified = None
-        self.short_name = None
         self.created = None
         self.accessed = None
+        self.short_name = None
         self.full_name = None
+        self.localized_name = None
+
         if bytes is None:
             return
 
         buf = BytesIO(bytes)
-        self.type = _ENTRY_TYPES.get(read_short(buf), 'UNKNOWN')
-        short_name_is_unicode = self.type.endswith('(UNICODE)')
 
-        if self.type == 'ROOT_KNOWN_FOLDER':
-            self.full_name = '::' + guid_from_bytes(buf.read(16))
-            # then followed Beef0026 structure:
-            # short size
-            # short version
-            # int signature == 0xBEEF0026
-            # (16 bytes) created timestamp
-            # (16 bytes) modified timestamp
-            # (16 bytes) accessed timestamp
-            return
+        type_and_flags = read_short(buf)
+        type_id = type_and_flags & 0xFFF0
+        assert type_id == _ENTRY_TYPE_IDS[self.type]
 
-        if self.type == 'KNOWN_FOLDER':
-            _ = read_short(buf)  # extra block size
-            extra_signature = read_int(buf)
-            if extra_signature == 0x23FEBBEE:
-                _ = read_short(buf)  # unknown
-                _ = read_short(buf)  # guid len
-                # that format recognized by explorer
-                self.full_name = '::' + guid_from_bytes(buf.read(16))
-            return
+        self.flags = FileOrFolderEntryFlags(type_and_flags & 0x000F)
 
         self.file_size = read_int(buf)
         self.modified = read_dos_datetime(buf)
         unknown = read_short(buf)  # FileAttributesL
-        if short_name_is_unicode:
+        if self.flags.IsUnicode:
             self.short_name = read_cunicode(buf)
         else:
             self.short_name = read_cstring(buf, padding=True)
@@ -107,104 +136,33 @@ class PathSegmentEntry(IDListEntry):
                         self.localized_name = read_cstring(buf)
                 version_offset = read_short(buf)
 
-    @classmethod
-    def create_for_path(cls, path: str, is_file: Optional[bool] = None) -> 'PathSegmentEntry':
-        entry = cls()
-        try:
-            st = os.stat(path)
-            entry.file_size = st.st_size
-            entry.modified = datetime.fromtimestamp(st.st_mtime)
-            entry.created = datetime.fromtimestamp(st.st_ctime)
-            entry.accessed = datetime.fromtimestamp(st.st_atime)
-            if is_file is None:
-                is_file = not os.path.isdir(path)
-        except OSError:  # ex.: not found or path too long
-            now = datetime.now()
-            entry.file_size = 0
-            entry.modified = now
-            entry.created = now
-            entry.accessed = now
-            if is_file is None:
-                is_file = '.' in ntpath.split(path)[-1][1:]
-        entry.short_name = ntpath.split(path)[1]
-        entry.full_name = entry.short_name
-        entry.type = TYPE_FILE if is_file else TYPE_FOLDER
-        return entry
-
-    def _validate(self) -> None:
-        if self.type is None:
-            raise MissingInformationException("Type is missing, choose either TYPE_FOLDER or TYPE_FILE.")
-        if self.file_size is None:
-            if self.type.startswith('FOLDER') or self.type in ('KNOWN_FOLDER', 'ROOT_KNOWN_FOLDER'):
-                self.file_size = 0
-            else:
-                raise MissingInformationException("File size missing")
-        if self.created is None:
-            self.created = datetime.now()
-        if self.modified is None:
-            self.modified = datetime.now()
-        if self.accessed is None:
-            self.accessed = datetime.now()
-        # if self.modified is None or self.accessed is None or self.created is None:
-        #     raise MissingInformationException("Date information missing")
-        if self.full_name is None:
-            raise MissingInformationException("A full name is missing")
-        if self.short_name is None:
-            self.short_name = self.full_name
-
     @property
     def bytes(self) -> bytes:
-        if self.full_name is None:
-            return b''
         self._validate()
-
         # explicit check to have strict types without optionals
         assert self.short_name is not None
-        assert self.type is not None
-        assert self.file_size is not None
+        assert self.full_name is not None
         assert self.modified is not None
         assert self.created is not None
         assert self.accessed is not None
+        assert self.file_size is not None
 
         out = BytesIO()
-        entry_type = self.type
-
-        if entry_type == 'KNOWN_FOLDER':
-            write_short(_ENTRY_TYPE_IDS[entry_type], out)
-            write_short(0x1A, out)  # size
-            write_int(0x23FEBBEE, out)  # extra signature
-            write_short(0x00, out)  # extra signature
-            write_short(0x10, out)  # guid size
-            out.write(bytes_from_guid(self.full_name.strip(':')))
-            return out.getvalue()
-
-        if entry_type == 'ROOT_KNOWN_FOLDER':
-            write_short(_ENTRY_TYPE_IDS[entry_type], out)
-            out.write(bytes_from_guid(self.full_name.strip(':')))
-            write_short(0x26, out)  # 0xBEEF0026 structure size
-            write_short(0x01, out)  # version
-            write_int(0xBEEF0026, out)  # extra signature
-            write_int(0x11, out)  # some flag for containing datetime
-            write_double(0x00, out)  # created datetime
-            write_double(0x00, out)  # modified datetime
-            write_double(0x00, out)  # accessed datetime
-            write_short(0x14, out)  # unknown
-            return out.getvalue()
-
         short_name_len = len(self.short_name) + 1
         try:
+            self.flags.IsUnicode = False
             self.short_name.encode("ascii")
-            short_name_is_unicode = False
             short_name_len += short_name_len % 2  # padding
         except (UnicodeEncodeError, UnicodeDecodeError):
-            short_name_is_unicode = True
+            self.flags.IsUnicode = True
             short_name_len = short_name_len * 2
-            self.type += " (UNICODE)"
-        write_short(_ENTRY_TYPE_IDS[entry_type], out)
+
+        type_and_flags = _ENTRY_TYPE_IDS[self.type] | self.flags.bytes
+        write_short(type_and_flags, out)
         write_int(self.file_size, out)
         write_dos_datetime(self.modified, out)
-        write_short(0x10, out)
-        if short_name_is_unicode:
+        write_short(0x10, out)  # observation: can be 0x11
+        if self.flags.IsUnicode:
             write_cunicode(self.short_name, out)
         else:
             write_cstring(self.short_name, out, padding=True)
@@ -224,17 +182,181 @@ class PathSegmentEntry(IDListEntry):
         write_short(offset_part2, out)
         return out.getvalue()
 
+    @property
+    def path(self) -> str:
+        return self.full_name or ''
+
+    def _validate(self) -> None:
+        if self.type is None:
+            raise MissingInformationException("Type is missing")
+        if self.file_size is None:
+            self.file_size = 0
+        if self.created is None:
+            self.created = datetime.now()
+        if self.modified is None:
+            self.modified = datetime.now()
+        if self.accessed is None:
+            self.accessed = datetime.now()
+        if self.full_name is None:
+            raise MissingInformationException("A full name is missing")
+        if self.short_name is None:
+            self.short_name = self.full_name
+
+    @classmethod
+    def create_for_path(cls, path: str, is_file: Optional[bool] = None) -> 'PathSegmentFileOrFolderEntry':
+        entry = cls()
+
+        fs_stat = None
+        try:
+            fs_stat = os.stat(path)
+            if is_file is None:
+                is_file = not os.path.isdir(path)
+        except OSError:  # ex.: not found or path too long
+            pass
+
+        if fs_stat:
+            entry.file_size = fs_stat.st_size
+            entry.modified = datetime.fromtimestamp(fs_stat.st_mtime)
+            entry.created = datetime.fromtimestamp(fs_stat.st_ctime)
+            entry.accessed = datetime.fromtimestamp(fs_stat.st_atime)
+        else:
+            now = datetime.now()
+            entry.file_size = 0
+            entry.modified = now
+            entry.created = now
+            entry.accessed = now
+
+        if is_file is None:
+            is_file = '.' in ntpath.split(path)[-1][1:]
+
+        entry.short_name = ntpath.split(path)[1]
+        entry.full_name = entry.short_name
+        if is_file:
+            entry.flags.IsFile = True
+        else:
+            entry.flags.IsDirectory = True
+        return entry
+
+    def __str__(self) -> str:
+        return "<PathSegmentFileOrFolderEntry: %s>" % self.full_name
+
     def json(self) -> dict:
         return {
-            'class': 'PathSegmentEntry',
-            'type': self.type,
+            'class': 'PathSegmentFileOrFolderEntry',
             'file_size': self.file_size,
             'modified': self.modified.isoformat() if self.modified else None,
             'created': self.created.isoformat() if self.created else None,
             'accessed': self.accessed.isoformat() if self.accessed else None,
             'short_name': self.short_name,
             'full_name': self.full_name,
+            'flags': self.flags.json(),
         }
 
+
+class PathSegmentKnownFolderEntry(PathSegmentEntry):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
+        self.type = 'KNOWN_FOLDER'
+
+        if bytes is None:
+            return
+
+        buf = BytesIO(bytes)
+        type_id = read_short(buf)
+        assert type_id == _ENTRY_TYPE_IDS[self.type]
+
+        _ = read_short(buf)  # extra block size
+        extra_signature = read_int(buf)
+        if extra_signature == 0x23FEBBEE:
+            _ = read_short(buf)  # unknown
+            _ = read_short(buf)  # guid len
+            # that format recognized by explorer
+            self.guid = '::' + guid_from_bytes(buf.read(16))
+
+    @property
+    def bytes(self) -> bytes:
+        self._validate()
+        out = BytesIO()
+        write_short(_ENTRY_TYPE_IDS[self.type], out)
+        write_short(0x1A, out)  # size
+        write_int(0x23FEBBEE, out)  # extra signature
+        write_short(0x00, out)  # unknown
+        write_short(0x10, out)  # guid size
+        out.write(bytes_from_guid(self.guid.strip(':')))
+        return out.getvalue()
+
+    @property
+    def path(self) -> str:
+        return self.guid
+
+    def _validate(self) -> None:
+        if self.type is None:
+            raise MissingInformationException("Type is missing")
+        if self.guid is None:
+            raise MissingInformationException("GUID is missing")
+
     def __str__(self) -> str:
-        return "<PathSegmentEntry: %s>" % self.full_name
+        return "<PathSegmentKnownFolderEntry: %s>" % self.guid
+
+    def json(self) -> dict:
+        return {
+            'class': 'PathSegmentKnownFolderEntry',
+            'type': self.type,
+            'guid': self.guid,
+        }
+
+
+class PathSegmentRootKnownFolderEntry(PathSegmentEntry):
+    def __init__(self, bytes: Optional[bytes] = None) -> None:
+        self.type = 'ROOT_KNOWN_FOLDER'
+
+        if bytes is None:
+            return
+
+        buf = BytesIO(bytes)
+        type_id = read_short(buf)
+        assert type_id == _ENTRY_TYPE_IDS[self.type]
+
+        self.guid = '::' + guid_from_bytes(buf.read(16))
+        # then followed Beef0026 structure:
+        # short size
+        # short version
+        # int signature == 0xBEEF0026
+        # (16 bytes) created timestamp
+        # (16 bytes) modified timestamp
+        # (16 bytes) accessed timestamp
+
+    @property
+    def bytes(self) -> bytes:
+        self._validate()
+        out = BytesIO()
+        write_short(_ENTRY_TYPE_IDS[self.type], out)
+        out.write(bytes_from_guid(self.guid.strip(':')))
+        write_short(0x26, out)  # 0xBEEF0026 structure size
+        write_short(0x01, out)  # version
+        write_int(0xBEEF0026, out)  # extra signature
+        write_int(0x11, out)  # some flag for containing datetime
+        write_double(0x00, out)  # created datetime
+        write_double(0x00, out)  # modified datetime
+        write_double(0x00, out)  # accessed datetime
+        write_short(0x14, out)  # unknown
+        return out.getvalue()
+
+    @property
+    def path(self) -> str:
+        return self.guid
+
+    def _validate(self) -> None:
+        if self.type is None:
+            raise MissingInformationException("Type is missing")
+        if self.guid is None:
+            raise MissingInformationException("GUID is missing")
+
+    def __str__(self) -> str:
+        return "<PathSegmentRootKnownFolderEntry: %s>" % self.guid
+
+    def json(self) -> dict:
+        return {
+            'class': 'PathSegmentRootKnownFolderEntry',
+            'type': self.type,
+            'guid': self.guid,
+        }

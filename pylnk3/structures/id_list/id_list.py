@@ -35,7 +35,7 @@ class LinkTargetIDList(Serializable):
                 elif len(raw[1]) == 0x17:
                     self.items.append(DriveEntry(raw[1]))
                 elif raw[1][0:2] == b'\x2E\x80':  # ROOT_KNOWN_FOLDER
-                    self.items.append(PathSegmentEntry(raw[1]))
+                    self.items.append(PathSegmentEntry.from_bytes(raw[1]))
                 else:
                     raise ValueError("This seems to be an absolute link which requires a drive as second element.")
                 items = raw[2:]
@@ -52,7 +52,7 @@ class LinkTargetIDList(Serializable):
             if item[4:8] == b'APPS':
                 self.items.append(UwpSegmentEntry(item))
             else:
-                self.items.append(PathSegmentEntry(item))
+                self.items.append(PathSegmentEntry.from_bytes(item))
 
     def get_path(self) -> str:
         segments: List[str] = []
@@ -62,8 +62,8 @@ class LinkTargetIDList(Serializable):
             elif isinstance(item, DriveEntry):
                 segments.append(item.drive.decode())
             elif isinstance(item, PathSegmentEntry):
-                if item.full_name is not None:
-                    segments.append(item.full_name)
+                if item.path is not None:
+                    segments.append(item.path)
             else:
                 segments.append(str(item))
         return '\\'.join(segments)
@@ -80,8 +80,8 @@ class LinkTargetIDList(Serializable):
                 return
             if (
                 isinstance(second_entry, PathSegmentEntry)
-                and second_entry.full_name is not None
-                and second_entry.full_name.startswith('::')
+                and second_entry.path is not None
+                and second_entry.path.startswith('::')
             ):
                 return
             raise ValueError("A drive is required for absolute lnks")

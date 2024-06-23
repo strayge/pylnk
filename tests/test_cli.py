@@ -6,9 +6,8 @@ from typing import Optional
 import pytest
 
 from pylnk3 import Lnk
-from pylnk3.structures import PathSegmentEntry
+from pylnk3.structures import PathSegmentFileOrFolderEntry
 from pylnk3.structures.id_list.base import IDListEntry
-from pylnk3.structures.id_list.path import TYPE_FILE, TYPE_FOLDER
 
 
 def quote_cmd(line: str) -> str:
@@ -30,9 +29,10 @@ def call_cli(params: str) -> Optional[str]:
     return result.stdout.decode()
 
 
-def check_segment_type(segment: IDListEntry, expected_type: str) -> None:
-    assert isinstance(segment, PathSegmentEntry)
-    assert segment.type == expected_type
+def check_segment_type(segment: IDListEntry, is_file: bool) -> None:
+    assert isinstance(segment, PathSegmentFileOrFolderEntry)
+    assert segment.flags.IsFile is is_file
+    assert segment.flags.IsDirectory is not is_file
 
 
 def test_cli_create_local_file(temp_filename: str) -> None:
@@ -43,21 +43,21 @@ def test_cli_create_local_file(temp_filename: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ('path', 'params', 'last_entry_type'),
+    ('path', 'params', 'last_entry_file'),
     (
         # detect by dot in name
-        ('C:\\folder\\file.txt', '', TYPE_FILE),
-        ('C:\\folder\\folder', '', TYPE_FOLDER),
+        ('C:\\folder\\file.txt', '', True),
+        ('C:\\folder\\folder', '', False),
         # overrive with cli argument
-        ('C:\\folder\\folder.with.txt', '--directory', TYPE_FOLDER),
-        ('C:\\folder\\file_without_txt', '--file', TYPE_FILE),
+        ('C:\\folder\\folder.with.txt', '--directory', False),
+        ('C:\\folder\\file_without_txt', '--file', True),
     ),
 )
-def test_cli_local_link_type(temp_filename: str, path: str, params: str, last_entry_type: str) -> None:
+def test_cli_local_link_type(temp_filename: str, path: str, params: str, last_entry_file: bool) -> None:
     call_cli(f'c {quote_cmd(path)} {temp_filename} {params}')
     lnk = Lnk.from_file(temp_filename)
-    check_segment_type(lnk.shell_item_id_list.items[-2], TYPE_FOLDER)
-    check_segment_type(lnk.shell_item_id_list.items[-1], last_entry_type)
+    check_segment_type(lnk.shell_item_id_list.items[-2], False)
+    check_segment_type(lnk.shell_item_id_list.items[-1], last_entry_file)
 
 
 def test_cli_create_net(temp_filename: str) -> None:
