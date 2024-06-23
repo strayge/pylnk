@@ -42,6 +42,13 @@ def test_cli_create_local_file(temp_filename: str) -> None:
     assert lnk.path == path
 
 
+def test_cli_create_local_file_unicode(temp_filename: str) -> None:
+    path = 'C:\\тест\\ööö\\👀file👀.txt'
+    call_cli(f'c {quote_cmd(path)} {temp_filename}')
+    lnk = Lnk.from_file(temp_filename)
+    assert lnk.path == path
+
+
 @pytest.mark.parametrize(
     ('path', 'params', 'last_entry_file'),
     (
