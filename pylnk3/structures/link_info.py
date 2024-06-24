@@ -3,7 +3,9 @@ from typing import Optional
 
 from pylnk3.exceptions import MissingInformationException
 from pylnk3.structures.base import Serializable
-from pylnk3.utils.read_write import read_cstring, read_int, write_byte, write_cstring, write_int
+from pylnk3.utils.read_write import (
+    read_cstring, read_cunicode, read_int, write_byte, write_cstring, write_cunicode, write_int,
+)
 
 DRIVE_NO_ROOT_DIR = "No root directory"
 DRIVE_REMOVABLE = "Removable"
@@ -31,11 +33,16 @@ _LINK_INFO_HEADER_OPTIONAL = 0x24
 class LinkInfo(Serializable):
 
     def __init__(self, lnk: Optional[BufferedIOBase] = None) -> None:
+        self.offs_local_base_path_unicode = 0
+        self.offs_local_base_path_suffix_unicode = 0
+        self.local_base_path_unicode: str = ''
+        self.local_base_path_suffix_unicode: str = ''
         if lnk is not None:
             self.start = lnk.tell()
             self.size = read_int(lnk)
             self.header_size = read_int(lnk)
             link_info_flags = read_int(lnk)
+            self.link_info_flags = link_info_flags
             self.local = link_info_flags & 1
             self.remote = link_info_flags & 2
             self.offs_local_volume_table = read_int(lnk)
@@ -43,7 +50,8 @@ class LinkInfo(Serializable):
             self.offs_network_volume_table = read_int(lnk)
             self.offs_base_name = read_int(lnk)
             if self.header_size >= _LINK_INFO_HEADER_OPTIONAL:
-                print("TODO: read the unicode stuff")  # TODO: read the unicode stuff
+                self.offs_local_base_path_unicode = read_int(lnk)
+                self.offs_local_base_path_suffix_unicode = read_int(lnk)
             self._parse_path_elements(lnk)
         else:
             self.size = 0
@@ -77,7 +85,11 @@ class LinkInfo(Serializable):
             self.volume_label = read_cstring(lnk)
             lnk.seek(self.start + self.offs_local_base_path)
             self.local_base_path = read_cstring(lnk)
-            # TODO: unicode
+        if self.offs_local_base_path_unicode:
+            lnk.seek(self.start + self.offs_local_base_path_unicode)
+            self.local_base_path_unicode = read_cunicode(lnk)
+            lnk.seek(self.start + self.offs_local_base_path_suffix_unicode)
+            self.local_base_path_suffix_unicode = read_cunicode(lnk)
         self.make_path()
 
     def make_path(self) -> None:
@@ -89,8 +101,12 @@ class LinkInfo(Serializable):
     def write(self, lnk: BufferedIOBase) -> None:
         if self.remote is None:
             raise MissingInformationException("No location information given.")
+        if self.remote and self.local_base_path_unicode:
+            raise ValueError("Remote links cannot have unicode paths in LinkInfo.")
         self.start = lnk.tell()
         self._calculate_sizes_and_offsets()
+
+        # header start
         write_int(self.size, lnk)
         write_int(self.header_size, lnk)
         write_int((self.local and 1) + (self.remote and 2), lnk)
@@ -98,32 +114,64 @@ class LinkInfo(Serializable):
         write_int(self.offs_local_base_path, lnk)
         write_int(self.offs_network_volume_table, lnk)
         write_int(self.offs_base_name, lnk)
+        if self.local_base_path_unicode:
+            write_int(self.offs_local_base_path_unicode, lnk)
+            write_int(self.offs_local_base_path_suffix_unicode, lnk)
+        # header end
+
         if self.remote:
             self._write_network_volume_table(lnk)
             write_cstring(self.base_name, lnk, padding=False)
-        else:
-            self._write_local_volume_table(lnk)
-            write_cstring(self.local_base_path, lnk, padding=False)
-            write_byte(0, lnk)
+            return
+
+        self._write_local_volume_table(lnk)
+        write_cstring(self.local_base_path, lnk, padding=False)
+        if self.local_base_path_unicode:
+            write_cunicode(self.local_base_path_unicode, lnk)
+            write_cunicode(self.local_base_path_suffix_unicode, lnk)
+        write_byte(0, lnk)
 
     def _calculate_sizes_and_offsets(self) -> None:
-        self.size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
-        self.size = 28 + self.size_base_name
+        self.offs_local_volume_table = 0
+        self.offs_local_base_path = 0
+        self.offs_network_volume_table = 0
+        self.offs_base_name = 0
+        self.offs_local_base_path_unicode = 0
+        self.offs_local_base_path_suffix_unicode = 0
+
+        self.header_size = _LINK_INFO_HEADER_DEFAULT
+        if self.local_base_path_unicode:
+            self.header_size += 8
+
+        # sizes
+        size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
         if self.remote:
             self.size_network_volume_table = 20 + len(self.network_share_name) + len(self.base_name) + 1
-            self.size += self.size_network_volume_table
-            self.offs_local_volume_table = 0
-            self.offs_local_base_path = 0
-            self.offs_network_volume_table = 28
-            self.offs_base_name = self.offs_network_volume_table + self.size_network_volume_table
         else:
             self.size_local_volume_table = 16 + len(self.volume_label) + 1
-            self.size_local_base_path = len(self.local_base_path) + 1
-            self.size += self.size_local_volume_table + self.size_local_base_path
-            self.offs_local_volume_table = 28
-            self.offs_local_base_path = self.offs_local_volume_table + self.size_local_volume_table
-            self.offs_network_volume_table = 0
-            self.offs_base_name = self.offs_local_base_path + self.size_local_base_path
+            size_local_base_path = len(self.local_base_path) + 1
+        if self.local_base_path_unicode:
+            size_local_base_path_unicode = len(self.local_base_path_unicode) * 2 + 4
+            size_local_base_path_suffix_unicode = len(self.local_base_path_suffix_unicode) * 2 + 2
+
+        # offsets
+        offset = self.header_size
+        if self.remote:
+            self.offs_network_volume_table = offset
+            offset += self.size_network_volume_table
+        else:
+            self.offs_local_volume_table = offset
+            offset += self.size_local_volume_table
+            self.offs_local_base_path = offset
+            offset += size_local_base_path
+            if self.local_base_path_unicode:
+                self.offs_local_base_path_unicode = offset
+                offset += size_local_base_path_unicode
+                self.offs_local_base_path_suffix_unicode = offset
+                offset += size_local_base_path_suffix_unicode
+        self.offs_base_name = offset
+        offset += size_base_name
+        self.size = offset
 
     def _write_network_volume_table(self, buf: BufferedIOBase) -> None:
         write_int(self.size_network_volume_table, buf)
@@ -156,6 +204,7 @@ class LinkInfo(Serializable):
             "drive_serial": self.drive_serial if not self.remote else None,
             "volume_label": self.volume_label if not self.remote else None,
             "local_base_path": self.local_base_path if not self.remote else None,
+            "local_base_path_unicode": self.local_base_path_unicode if self.local else None,
         }
 
     def __str__(self) -> str:
@@ -172,4 +221,5 @@ class LinkInfo(Serializable):
             s += "\n  Volume Serial Number: %s" % self.drive_serial
             s += "\n  Volume Label: %s" % self.volume_label
             s += "\n  Path: %s" % self.local_base_path
+            s += "\n  Path (Unicode): %s" % self.local_base_path_unicode
         return s

@@ -103,6 +103,11 @@ def test_local_emoji(examples_path: str, temp_filename: str) -> None:
     lnk.save(temp_filename)
     lnk2 = Lnk.from_file(temp_filename)
     assert lnk2.path == path
+    # check unicode fields in link_info
+    assert lnk.link_info.local_base_path_unicode == path
+    assert lnk.link_info.local_base_path_suffix_unicode == ''
+    assert lnk2.link_info.local_base_path_unicode == path
+    assert lnk2.link_info.local_base_path_suffix_unicode == ''
 
 
 def test_local_thispc(examples_path: str, temp_filename: str) -> None:
