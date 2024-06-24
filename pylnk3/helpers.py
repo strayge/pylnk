@@ -41,12 +41,6 @@ def parse(lnk: str) -> Lnk:
     return Lnk.from_file(lnk)
 
 
-def create(f: Optional[str] = None) -> Lnk:
-    if f is None:
-        return Lnk.from_file(f)
-    return Lnk()
-
-
 def for_file(
     target_file: str,
     lnk_name: Optional[str] = None,
@@ -58,7 +52,7 @@ def for_file(
     window_mode: Optional[str] = None,
     is_file: Optional[bool] = None,
 ) -> Lnk:
-    lnk = create(lnk_name)
+    lnk = Lnk()
     lnk.link_flags.IsUnicode = True
     lnk.link_info = None
     if target_file.startswith('\\\\'):
