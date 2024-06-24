@@ -82,6 +82,7 @@ pylnk3 create 'c:\\dir\\file.txt' text.lnk -m Minimized -d "Description"
 **dev**
 add `--json` format for `parse` command
 `Lnk` class now has separated constructors `Lnk.from_bytes()` and `Lnk.from_file()`
+add `--cp` option to specify codepage for ANSI strings
 [FIX] strings with 2-bytes unicode characters now correctly written on save
 [FIX] allow read/write links with only `This PC` part in target
 [FIX] allow read completely unknown `ExtraData` blocks

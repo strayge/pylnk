@@ -74,7 +74,8 @@ class PathSegmentEntry(IDListEntry):
 
 
 class PathSegmentFileOrFolderEntry(PathSegmentEntry):
-    def __init__(self, bytes: Optional[bytes] = None) -> None:
+    def __init__(self, bytes: Optional[bytes] = None, cp: Optional[str] = None) -> None:
+        self.cp = cp
         self.type = 'FILE_OR_FOLDER'
         self.flags = FileOrFolderEntryFlags()
 
@@ -103,7 +104,7 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         if self.flags.IsUnicode:
             self.short_name = read_cunicode(buf)
         else:
-            self.short_name = read_cstring(buf, padding=True)
+            self.short_name = read_cstring(buf, padding=True, cp=self.cp)
         extra_size = read_short(buf)
         extra_version = read_short(buf)
         extra_signature = read_int(buf)
@@ -133,7 +134,7 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
                     if extra_version >= 7:
                         self.localized_name = read_cunicode(buf)
                     else:
-                        self.localized_name = read_cstring(buf)
+                        self.localized_name = read_cstring(buf, cp=self.cp)
                 version_offset = read_short(buf)
 
     @property
@@ -165,7 +166,7 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         if self.flags.IsUnicode:
             write_cunicode(self.short_name, out)
         else:
-            write_cstring(self.short_name, out, padding=True)
+            write_cstring(self.short_name, out, padding=True, cp=self.cp)
 
         version = 3  # just hardcode some version
         # structures below compatible with versions 3 and 9 in case someone needs it
@@ -220,8 +221,10 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
             self.short_name = self.full_name
 
     @classmethod
-    def create_for_path(cls, path: str, is_file: Optional[bool] = None) -> 'PathSegmentFileOrFolderEntry':
-        entry = cls()
+    def create_for_path(
+        cls, path: str, is_file: Optional[bool] = None, cp: Optional[str] = None,
+    ) -> 'PathSegmentFileOrFolderEntry':
+        entry = cls(cp=cp)
 
         fs_stat = None
         try:

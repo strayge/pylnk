@@ -36,6 +36,7 @@ def main() -> None:
     parser_parse.add_argument('filename', help='lnk filename to read')
     parser_parse.add_argument('props', nargs='*', help='props path to read')
     parser_parse.add_argument('--json', '-j', action='store_true', help='output as json')
+    parser_parse.add_argument('--cp', nargs='?', help='codepage for ANSI strings')
 
     parser_create = subparsers.add_parser('create', aliases=['c'], help='create new lnk file')
     parser_create.add_argument('target', help='target path')
@@ -50,10 +51,12 @@ def main() -> None:
     parser_create.add_argument(
         '--directory', action='store_true', help='threat target as directory (by default guessed by dot in target)',
     )
+    parser_create.add_argument('--cp', nargs='?', help='codepage for ANSI strings')
 
     parser_dup = subparsers.add_parser('duplicate', aliases=['d'], help='read and write lnk file')
     parser_dup.add_argument('filename', help='lnk filename to read')
     parser_dup.add_argument('new_filename', help='new filename to write')
+    parser_dup.add_argument('--cp', nargs='?', help='codepage for ANSI strings')
 
     args = parser.parse_args()
     if args.help or not args.action:
@@ -72,9 +75,10 @@ def main() -> None:
             icon_index=args.icon_index, work_dir=args.workdir,
             window_mode=args.mode,
             is_file=is_file,
+            cp=args.cp,
         )
     elif args.action in ('parse', 'p'):
-        lnk = parse(args.filename)
+        lnk = parse(args.filename, cp=args.cp)
         props = args.props
         if len(props) == 0:
             print(json.dumps(lnk.json(), indent=4) if args.json else lnk.text())
@@ -82,7 +86,7 @@ def main() -> None:
             for prop in props:
                 print(get_prop(lnk, prop.split('.')))
     elif args.action in ('d', 'duplicate'):
-        lnk = parse(args.filename)
+        lnk = parse(args.filename, cp=args.cp)
         new_filename = args.new_filename
         print(lnk)
         lnk.save(new_filename)

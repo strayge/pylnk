@@ -53,7 +53,8 @@ def assert_lnk_signature(f: BufferedIOBase) -> None:
 
 class Lnk(Serializable):
 
-    def __init__(self) -> None:
+    def __init__(self, cp: Optional[str] = None) -> None:
+        self.cp = cp
         self.link_flags = LinkFlags()
         self.file_flags = FileFlags()
         self.creation_time = datetime.now()
@@ -63,7 +64,7 @@ class Lnk(Serializable):
         self.icon_index = 0
         self._show_command = WINDOW_NORMAL
         self.hot_key: Optional[str] = None
-        self._link_info = LinkInfo()
+        self._link_info = LinkInfo(cp=self.cp)
         self.description = None
         self.relative_path = None
         self.work_dir = None
@@ -118,7 +119,7 @@ class Lnk(Serializable):
 
         # LINKINFO (HasLinkInfo)
         if self.link_flags.HasLinkInfo and not self.link_flags.ForceNoLinkInfo:
-            self._link_info = LinkInfo(lnk)
+            self._link_info = LinkInfo(lnk, cp=self.cp)
             lnk.seek(self._link_info.start + self._link_info.size)
 
         # STRING_DATA = [NAME_STRING] [RELATIVE_PATH] [WORKING_DIR] [COMMAND_LINE_ARGUMENTS] [ICON_LOCATION]
@@ -305,10 +306,10 @@ class Lnk(Serializable):
         self._link_info.make_path()
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> 'Lnk':
+    def from_bytes(cls, data: bytes, cp: Optional[str] = None) -> 'Lnk':
         f = BytesIO(data)
         assert_lnk_signature(f)
-        lnk = cls()
+        lnk = cls(cp=cp)
         lnk._parse_lnk_file(f)
         return lnk
 
@@ -342,15 +343,16 @@ class Lnk(Serializable):
         cls,
         filename: Optional[str] = None,
         file: Optional[BufferedReader] = None,
+        cp: Optional[str] = None,
     ) -> 'Lnk':
         """Create Lnk object from file (by filename or file-like object)."""
         if filename:
             if not os.path.exists(filename):
                 filename += ".lnk"
             with open(filename, 'rb') as f:
-                return cls.from_bytes(f.read())
+                return cls.from_bytes(f.read(), cp=cp)
         elif file:
-            return cls.from_bytes(file.read())
+            return cls.from_bytes(file.read(), cp=cp)
         raise ValueError("Either filename or file must be specified")
 
     def __str__(self) -> str:

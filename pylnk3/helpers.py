@@ -37,8 +37,8 @@ def is_drive(data: Union[str, Any]) -> bool:
     return p.match(data) is not None
 
 
-def parse(lnk: str) -> Lnk:
-    return Lnk.from_file(lnk)
+def parse(lnk: str, cp: Optional[str] = None) -> Lnk:
+    return Lnk.from_file(lnk, cp=cp)
 
 
 def for_file(
@@ -51,13 +51,14 @@ def for_file(
     work_dir: Optional[str] = None,
     window_mode: Optional[str] = None,
     is_file: Optional[bool] = None,
+    cp: Optional[str] = None,
 ) -> Lnk:
-    lnk = Lnk()
+    lnk = Lnk(cp=cp)
     lnk.link_flags.IsUnicode = True
     lnk.link_info = None
     if target_file.startswith('\\\\'):
         # remote link
-        lnk.link_info = LinkInfo()
+        lnk.link_info = LinkInfo(cp=cp)
         lnk.link_info.remote = 1
         # extract server + share name from full path
         path_parts = target_file.split('\\')
@@ -80,7 +81,11 @@ def for_file(
         for level in levels[1:]:
             is_last_level = level == levels[-1]
             # consider all segments before last as directory
-            segment = PathSegmentFileOrFolderEntry.create_for_path(level, is_file=is_file if is_last_level else False)
+            segment = PathSegmentFileOrFolderEntry.create_for_path(
+                path=level,
+                is_file=is_file if is_last_level else False,
+                cp=cp,
+            )
             elements.append(segment)
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
@@ -108,6 +113,7 @@ def for_file(
 def from_segment_list(
     data: List[Union[str, Dict[str, Any]]],
     lnk_name: Optional[str] = None,
+    cp: Optional[str] = None,
 ) -> Lnk:
     """
     Creates a lnk file from a list of path segments.
@@ -137,7 +143,7 @@ def from_segment_list(
     """
     if not isinstance(data, (list, tuple)):
         raise ValueError("Invalid data format, list or tuple expected")
-    lnk = Lnk()
+    lnk = Lnk(cp=cp)
     entries: List[IDListEntry] = []
     if is_drive(data[0]):
         assert isinstance(data[0], str)

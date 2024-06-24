@@ -1,7 +1,7 @@
 from datetime import datetime
 from io import BufferedIOBase
 from struct import pack, unpack
-from typing import Union
+from typing import Optional, Union
 
 DEFAULT_CHARSET = 'cp1251'
 
@@ -31,7 +31,7 @@ def read_cunicode(buf: BufferedIOBase) -> str:
     return s.decode('utf-16-le')
 
 
-def read_cstring(buf: BufferedIOBase, padding: bool = False) -> str:
+def read_cstring(buf: BufferedIOBase, padding: bool = False, cp: Optional[str] = None) -> str:
     s = b""
     b = buf.read(1)
     while b != b'\x00':
@@ -40,7 +40,7 @@ def read_cstring(buf: BufferedIOBase, padding: bool = False) -> str:
     if padding and not len(s) % 2:
         buf.read(1)  # make length + terminator even
     # TODO: encoding is not clear, unicode-escape has been necessary sometimes
-    return s.decode(DEFAULT_CHARSET)
+    return s.decode(cp or DEFAULT_CHARSET)
 
 
 def read_sized_string(buf: BufferedIOBase, string: bool = True) -> Union[str, bytes]:
@@ -90,9 +90,9 @@ def write_double(val: int, buf: BufferedIOBase) -> None:
     buf.write(pack('<Q', val))
 
 
-def write_cstring(val: str, buf: BufferedIOBase, padding: bool = False) -> None:
+def write_cstring(val: str, buf: BufferedIOBase, padding: bool = False, cp: Optional[str] = None) -> None:
     # val = val.encode('unicode-escape').replace('\\\\', '\\')
-    val_bytes = val.encode(DEFAULT_CHARSET)
+    val_bytes = val.encode(cp or DEFAULT_CHARSET)
     buf.write(val_bytes + b'\x00')
     if padding and not len(val_bytes) % 2:
         buf.write(b'\x00')

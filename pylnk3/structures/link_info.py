@@ -32,7 +32,8 @@ _LINK_INFO_HEADER_OPTIONAL = 0x24
 
 class LinkInfo(Serializable):
 
-    def __init__(self, lnk: Optional[BufferedIOBase] = None) -> None:
+    def __init__(self, lnk: Optional[BufferedIOBase] = None, cp: Optional[str] = None) -> None:
+        self.cp = cp
         self.offs_local_base_path_unicode = 0
         self.offs_local_base_path_suffix_unicode = 0
         self.local_base_path_unicode: str = ''
@@ -74,17 +75,17 @@ class LinkInfo(Serializable):
         if self.remote:
             # 20 is the offset of the network share name
             lnk.seek(self.start + self.offs_network_volume_table + 20)
-            self.network_share_name = read_cstring(lnk)
+            self.network_share_name = read_cstring(lnk, cp=self.cp)
             lnk.seek(self.start + self.offs_base_name)
-            self.base_name = read_cstring(lnk)
+            self.base_name = read_cstring(lnk, cp=self.cp)
         if self.local:
             lnk.seek(self.start + self.offs_local_volume_table + 4)
             self.drive_type = _DRIVE_TYPES.get(read_int(lnk))
             self.drive_serial = read_int(lnk)
             lnk.read(4)  # volume name offset (10h)
-            self.volume_label = read_cstring(lnk)
+            self.volume_label = read_cstring(lnk, cp=self.cp)
             lnk.seek(self.start + self.offs_local_base_path)
-            self.local_base_path = read_cstring(lnk)
+            self.local_base_path = read_cstring(lnk, cp=self.cp)
         if self.offs_local_base_path_unicode:
             lnk.seek(self.start + self.offs_local_base_path_unicode)
             self.local_base_path_unicode = read_cunicode(lnk)
@@ -121,11 +122,11 @@ class LinkInfo(Serializable):
 
         if self.remote:
             self._write_network_volume_table(lnk)
-            write_cstring(self.base_name, lnk, padding=False)
+            write_cstring(self.base_name, lnk, padding=False, cp=self.cp)
             return
 
         self._write_local_volume_table(lnk)
-        write_cstring(self.local_base_path, lnk, padding=False)
+        write_cstring(self.local_base_path, lnk, padding=False, cp=self.cp)
         if self.local_base_path_unicode:
             write_cunicode(self.local_base_path_unicode, lnk)
             write_cunicode(self.local_base_path_suffix_unicode, lnk)
@@ -179,7 +180,7 @@ class LinkInfo(Serializable):
         write_int(20, buf)  # size of Network Volume Table
         write_int(0, buf)  # ?
         write_int(131072, buf)  # ?
-        write_cstring(self.network_share_name, buf)
+        write_cstring(self.network_share_name, buf, cp=self.cp)
 
     def _write_local_volume_table(self, buf: BufferedIOBase) -> None:
         write_int(self.size_local_volume_table, buf)
@@ -189,7 +190,7 @@ class LinkInfo(Serializable):
         write_int(drive_type, buf)
         write_int(self.drive_serial, buf)
         write_int(16, buf)  # volume name offset
-        write_cstring(self.volume_label, buf)
+        write_cstring(self.volume_label, buf, cp=self.cp)
 
     @property
     def path(self) -> str:
