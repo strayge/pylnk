@@ -991,7 +991,7 @@ class LinkInfo(object):
             self.offs_network_volume_table = read_int(lnk)
             self.offs_base_name = read_int(lnk)
             if self.header_size >= _LINK_INFO_HEADER_OPTIONAL:
-                print("TODO: read the unicode stuff")  # TODO: read the unicode stuff
+                pass # TODO: read the unicode stuff
             self._parse_path_elements(lnk)
         else:
             self.size = None
