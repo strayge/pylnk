@@ -72,6 +72,9 @@ pylnk3 create c:\1.txt text.lnk -m Minimized -d "Description"
 
 ## Changes
 
+**0.4.3**  
+remove unnecessary print
+
 **0.4.2**  
 changed logic for Lnk.path choose (in case of different paths presents at different structures)  
 read links with root as GUID of KNOWN_FOLDER  

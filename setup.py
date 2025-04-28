@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="pylnk3",
-    version="0.4.2",
+    version="0.4.3",
     py_modules=["pylnk3"],
     entry_points={
         'console_scripts': [
