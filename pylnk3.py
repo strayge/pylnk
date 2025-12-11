@@ -1243,7 +1243,7 @@ class TypedPropertyValue(object):
         value = self.value
         if self.type == 0x1F:
             size = value[:4]
-            value = value[4:].decode('utf-16-le')
+            value = value[4:].decode('utf-16-le').rstrip('\x00')
         if self.type == 0x15:
             value = unpack('<Q', value)[0]
         if self.type == 0x13:
