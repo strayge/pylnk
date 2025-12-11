@@ -1177,7 +1177,7 @@ class ExtraData_IconEnvironmentDataBlock(object):
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
-        self.target_ansi = buf.read(260).decode('ansi')
+        self.target_ansi = buf.read(260).decode('cp1252')
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
@@ -1243,7 +1243,7 @@ class TypedPropertyValue(object):
         value = self.value
         if self.type == 0x1F:
             size = value[:4]
-            value = value[4:].decode('utf-16-le')
+            value = value[4:].decode('utf-16-le').rstrip('\x00')
         if self.type == 0x15:
             value = unpack('<Q', value)[0]
         if self.type == 0x13:
