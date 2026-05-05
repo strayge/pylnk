@@ -664,7 +664,7 @@ class PathSegmentEntry(object):
         except (UnicodeEncodeError, UnicodeDecodeError):
             short_name_is_unicode = True
             short_name_len = short_name_len * 2
-            self.type += " (UNICODE)"
+            entry_type += " (UNICODE)"
         write_short(_ENTRY_TYPE_IDS[entry_type], out)
         write_int(self.file_size, out)
         write_dos_datetime(self.modified, out)
