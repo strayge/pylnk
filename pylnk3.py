@@ -131,6 +131,7 @@ _ROOT_LOCATION_GUIDS = dict((v, k) for k, v in _ROOT_LOCATIONS.items())
 
 TYPE_FOLDER = 'FOLDER'
 TYPE_FILE = 'FILE'
+TYPE_UNICODE_SUFFIX = ' (UNICODE)'
 _ENTRY_TYPES = {
     0x00: 'KNOWN_FOLDER',
     0x31: 'FOLDER',
@@ -523,7 +524,7 @@ class PathSegmentEntry(object):
 
         buf = BytesIO(bytes)
         self.type = _ENTRY_TYPES.get(read_short(buf), 'UNKNOWN')
-        short_name_is_unicode = self.type.endswith('(UNICODE)')
+        short_name_is_unicode = self.type.endswith(TYPE_UNICODE_SUFFIX)
 
         if self.type == 'ROOT_KNOWN_FOLDER':
             self.full_name = '::' + guid_from_bytes(buf.read(16))
@@ -656,15 +657,21 @@ class PathSegmentEntry(object):
             write_short(0x14, out)  # unknown
             return out.getvalue()
 
+        already_has_unicode_type = entry_type.endswith(TYPE_UNICODE_SUFFIX)
         short_name_len = len(self.short_name) + 1
         try:
             self.short_name.encode("ascii")
             short_name_is_unicode = False
             short_name_len += short_name_len % 2  # padding
+            if already_has_unicode_type:
+                entry_type = entry_type[:-len(TYPE_UNICODE_SUFFIX)]
+                self.type = entry_type
         except (UnicodeEncodeError, UnicodeDecodeError):
             short_name_is_unicode = True
             short_name_len = short_name_len * 2
-            self.type += " (UNICODE)"
+            if not already_has_unicode_type:
+                entry_type += TYPE_UNICODE_SUFFIX
+                self.type = entry_type
         write_short(_ENTRY_TYPE_IDS[entry_type], out)
         write_int(self.file_size, out)
         write_dos_datetime(self.modified, out)
