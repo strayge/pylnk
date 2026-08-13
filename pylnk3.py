@@ -6,6 +6,7 @@
 # converted to python3 by strayge:
 # https://github.com/strayge/pylnk
 import argparse
+import locale
 import ntpath
 import os
 import re
@@ -16,7 +17,10 @@ from pprint import pformat
 from struct import pack, unpack
 from typing import Dict, Optional, Tuple, Union
 
-DEFAULT_CHARSET = 'cp1251'
+# ANSI strings in .lnk files use the system ANSI codepage (Windows-created files).
+# On Windows this is the ACP (e.g. cp1252 Western Europe, cp1251 Cyrillic);
+# fall back to cp1252 on non-Windows platforms.
+DEFAULT_CHARSET = locale.getpreferredencoding(False) or 'cp1252'
 
 # ---- constants
 
@@ -937,7 +941,7 @@ class LinkTargetIDList(object):
             if type(item) == RootEntry:
                 segments.append('%' + item.root + '%')
             elif type(item) == DriveEntry:
-                segments.append(item.drive.decode())
+                segments.append(item.drive.decode('ascii', errors='replace'))
             elif type(item) == PathSegmentEntry:
                 if item.full_name is not None:
                     segments.append(item.full_name)
@@ -1177,7 +1181,7 @@ class ExtraData_IconEnvironmentDataBlock(object):
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
-        self.target_ansi = buf.read(260).decode('ansi')
+        self.target_ansi = buf.read(260).decode(DEFAULT_CHARSET)
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
@@ -1403,7 +1407,7 @@ class ExtraData_EnvironmentVariableDataBlock(object):
 
     def read(self, bytes):
         buf = BytesIO(bytes)
-        self.target_ansi = buf.read(260).decode()
+        self.target_ansi = buf.read(260).decode(DEFAULT_CHARSET)
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
