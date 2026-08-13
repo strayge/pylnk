@@ -19,12 +19,24 @@ from struct import pack, unpack
 from typing import Dict, Optional, Tuple, Union
 
 # ANSI strings in .lnk files use the ANSI codepage of the Windows system that
-# created them. On Windows, use the current system's ACP; on other platforms
-# default to cp1252 (the most common ACP for Western-European .lnk files).
-if sys.platform == 'win32':
-    DEFAULT_CHARSET = locale.getpreferredencoding(False) or 'cp1252'
-else:
-    DEFAULT_CHARSET = 'cp1252'
+# created them. Resolution order:
+#   1. PYLNK3_CHARSET environment variable (explicit override, e.g. 'cp1251'
+#      for Cyrillic, 'cp932' for Japanese, 'cp1252' for Western European).
+#   2. On Windows, the current system's ACP via locale.getpreferredencoding().
+#   3. cp1252 (the most common ACP) on other platforms.
+#
+# DEFAULT_CHARSET is a module-level variable; it can also be reassigned at
+# runtime before parsing, e.g.:  pylnk3.DEFAULT_CHARSET = 'cp1251'
+def _default_charset():
+    env = os.environ.get('PYLNK3_CHARSET')
+    if env:
+        return env
+    if sys.platform == 'win32':
+        return locale.getpreferredencoding(False) or 'cp1252'
+    return 'cp1252'
+
+
+DEFAULT_CHARSET = _default_charset()
 
 # ---- constants
 
