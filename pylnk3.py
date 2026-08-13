@@ -10,6 +10,7 @@ import locale
 import ntpath
 import os
 import re
+import sys
 import time
 from datetime import datetime
 from io import BytesIO, IOBase
@@ -17,10 +18,13 @@ from pprint import pformat
 from struct import pack, unpack
 from typing import Dict, Optional, Tuple, Union
 
-# ANSI strings in .lnk files use the system ANSI codepage (Windows-created files).
-# On Windows this is the ACP (e.g. cp1252 Western Europe, cp1251 Cyrillic);
-# fall back to cp1252 on non-Windows platforms.
-DEFAULT_CHARSET = locale.getpreferredencoding(False) or 'cp1252'
+# ANSI strings in .lnk files use the ANSI codepage of the Windows system that
+# created them. On Windows, use the current system's ACP; on other platforms
+# default to cp1252 (the most common ACP for Western-European .lnk files).
+if sys.platform == 'win32':
+    DEFAULT_CHARSET = locale.getpreferredencoding(False) or 'cp1252'
+else:
+    DEFAULT_CHARSET = 'cp1252'
 
 # ---- constants
 
