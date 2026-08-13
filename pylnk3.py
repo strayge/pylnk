@@ -6,9 +6,11 @@
 # converted to python3 by strayge:
 # https://github.com/strayge/pylnk
 import argparse
+import locale
 import ntpath
 import os
 import re
+import sys
 import time
 from datetime import datetime
 from io import BytesIO, IOBase
@@ -16,7 +18,25 @@ from pprint import pformat
 from struct import pack, unpack
 from typing import Dict, Optional, Tuple, Union
 
-DEFAULT_CHARSET = 'cp1251'
+# ANSI strings in .lnk files use the ANSI codepage of the Windows system that
+# created them. Resolution order:
+#   1. PYLNK3_CHARSET environment variable (explicit override, e.g. 'cp1251'
+#      for Cyrillic, 'cp932' for Japanese, 'cp1252' for Western European).
+#   2. On Windows, the current system's ACP via locale.getpreferredencoding().
+#   3. cp1252 (the most common ACP) on other platforms.
+#
+# DEFAULT_CHARSET is a module-level variable; it can also be reassigned at
+# runtime before parsing, e.g.:  pylnk3.DEFAULT_CHARSET = 'cp1251'
+def _default_charset():
+    env = os.environ.get('PYLNK3_CHARSET')
+    if env:
+        return env
+    if sys.platform == 'win32':
+        return locale.getpreferredencoding(False) or 'cp1252'
+    return 'cp1252'
+
+
+DEFAULT_CHARSET = _default_charset()
 
 # ---- constants
 
@@ -937,7 +957,7 @@ class LinkTargetIDList(object):
             if type(item) == RootEntry:
                 segments.append('%' + item.root + '%')
             elif type(item) == DriveEntry:
-                segments.append(item.drive.decode())
+                segments.append(item.drive.decode('ascii', errors='replace'))
             elif type(item) == PathSegmentEntry:
                 if item.full_name is not None:
                     segments.append(item.full_name)
@@ -1177,7 +1197,7 @@ class ExtraData_IconEnvironmentDataBlock(object):
         buf = BytesIO(bytes)
         # self._size = read_int(buf)
         # self._signature = read_int(buf)
-        self.target_ansi = buf.read(260).decode('ansi')
+        self.target_ansi = buf.read(260).decode(DEFAULT_CHARSET)
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
@@ -1403,7 +1423,7 @@ class ExtraData_EnvironmentVariableDataBlock(object):
 
     def read(self, bytes):
         buf = BytesIO(bytes)
-        self.target_ansi = buf.read(260).decode()
+        self.target_ansi = buf.read(260).decode(DEFAULT_CHARSET)
         self.target_unicode = buf.read(520).decode('utf-16-le')
 
     def bytes(self):
