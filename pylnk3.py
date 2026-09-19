@@ -162,6 +162,10 @@ def read_int(buf):
     return unpack('<I', buf.read(4))[0]
 
 
+def read_signed_int(buf):
+    return unpack('<i', buf.read(4))[0]
+
+
 def read_double(buf):
     return unpack('<Q', buf.read(8))[0]
 
@@ -230,6 +234,10 @@ def write_int(val, buf):
     buf.write(pack('<I', val))
 
 
+def write_signed_int(val, buf):
+    buf.write(pack('<i', val))
+
+
 def write_double(val, buf):
     buf.write(pack('<Q', val))
 
@@ -281,11 +289,21 @@ def convert_time_to_unix(windows_time):
     unix_time = windows_time / 10000000.0 - 11644473600
     try:
         return datetime.fromtimestamp(unix_time)
-    except OSError:
-        return datetime.now()
+    except (OSError, ValueError, OverflowError):
+        # FILETIME outside the representable datetime range. Which exception is
+        # raised is platform-dependent: Windows raises OSError, Linux ValueError.
+        # Returning None makes the failure visible to the caller; returning a
+        # synthesised time made an unreadable timestamp indistinguishable from a
+        # genuine one.
+        return None
 
 
 def convert_time_to_windows(unix_time):
+    if unix_time is None:
+        # Unset or unreadable timestamp. FILETIME 0 is the standard
+        # representation of 'not set', so round-trip it back to 0 rather than
+        # failing or inventing a value.
+        return 0
     if isinstance(unix_time, datetime):
         unix_time = time.mktime(unix_time.timetuple())
     return int((unix_time + 11644473600) * 10000000)
@@ -1541,7 +1559,7 @@ class Lnk(object):
         self.access_time = convert_time_to_unix(read_double(lnk))
         self.modification_time = convert_time_to_unix(read_double(lnk))
         self.file_size = read_int(lnk)
-        self.icon_index = read_int(lnk)
+        self.icon_index = read_signed_int(lnk)
         show_command = read_int(lnk)
         self._show_command = _SHOW_COMMANDS[show_command] if show_command in _SHOW_COMMANDS else _SHOW_COMMANDS[1]
         self.hot_key = self._read_hot_key(lnk)
@@ -1599,7 +1617,7 @@ class Lnk(object):
         write_double(convert_time_to_windows(self.access_time), lnk)
         write_double(convert_time_to_windows(self.modification_time), lnk)
         write_int(self.file_size, lnk)
-        write_int(self.icon_index, lnk)
+        write_signed_int(self.icon_index, lnk)
         write_int(_SHOW_COMMAND_IDS[self._show_command], lnk)
         self._write_hot_key(self.hot_key, lnk)
         lnk.write(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')  # reserved
