@@ -7,11 +7,14 @@ import pytest
 from pylnk3.structures.id_list.path import PathSegmentFileOrFolderEntry
 
 
-def _segment_bytes(short_name: str, full_name: str, is_file: bool = False) -> bytes:
+def _segment_bytes(
+    short_name: str, full_name: str, is_file: bool = False, localized_name: str | None = None,
+) -> bytes:
     """Fixed metadata prevents filesystem state and wall-clock time from influencing bytes."""
     entry = PathSegmentFileOrFolderEntry()
     entry.short_name = short_name
     entry.full_name = full_name
+    entry.localized_name = localized_name
     entry.flags.IsFile = is_file
     entry.flags.IsDirectory = not is_file
     entry.file_size = 123 if is_file else 0
@@ -84,6 +87,41 @@ def test_extension_trailing_offset(short_name: str, short_byte_count: int) -> No
     data = _segment_bytes(short_name, '📁')
     extension_start = 12 + short_byte_count
     assert unpack_from('<H', data, len(data) - 2)[0] == extension_start + 2
+
+
+@pytest.mark.parametrize(('localized_name', 'localized_bytes', 'version', 'full_offset', 'localized_offset'), [
+    (None, b'', 3, 20, 0),
+    ('', b'\x00\x00', 9, 46, 60),
+    ('目录', b'\xee\x76\x55\x5f\x00\x00', 9, 46, 60),
+    ('😀🚀', b'\x3d\xd8\x00\xde\x3d\xd8\x80\xde\x00\x00', 9, 46, 60),
+])
+def test_localized_extension_layout(
+    localized_name: str | None, localized_bytes: bytes, version: int, full_offset: int, localized_offset: int,
+) -> None:
+    """Independent offsets and payloads distinguish absent names from present empty UTF16 names."""
+    data = _segment_bytes('SHORT', 'Full📁', localized_name=localized_name)
+    extension_start = 18  # Fixed header and the terminated, even-length ASCII short name.
+    full_bytes = b'F\x00u\x00l\x00l\x00\x3d\xd8\xc1\xdc\x00\x00'
+    expected_size = full_offset + len(full_bytes) + len(localized_bytes) + 2
+
+    assert data[12:extension_start] == b'SHORT\x00'
+    assert unpack_from('<HHI', data, extension_start) == (expected_size, version, 0xBEEF0004)
+    assert unpack_from('<H', data, extension_start + 16)[0] == full_offset
+    if version == 9:
+        assert data[extension_start + 18:extension_start + 36] == b'\x00' * 18
+        assert unpack_from('<H', data, extension_start + 36)[0] == localized_offset
+        assert data[extension_start + 38:extension_start + 46] == b'\x00' * 8
+        assert data[extension_start + localized_offset:-2] == localized_bytes
+    else:
+        assert unpack_from('<H', data, extension_start + 18)[0] == 0
+    full_start = extension_start + full_offset
+    assert data[full_start:full_start + len(full_bytes)] == full_bytes
+    assert len(data) == extension_start + expected_size
+    assert unpack_from('<H', data, len(data) - 2)[0] == extension_start + 2
+
+    restored = PathSegmentFileOrFolderEntry(data)
+    assert restored.full_name == 'Full📁'
+    assert restored.localized_name == localized_name
 
 
 @pytest.mark.parametrize(('filename', 'short_name', 'full_name'), [

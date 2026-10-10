@@ -120,16 +120,16 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
                 offset_ansi = read_short(buf)
                 file_reference = read_double(buf)
                 unknown2 = read_double(buf)
-            long_string_size = 0
+            localized_name_offset = 0
             if extra_version >= 3:
-                long_string_size = read_short(buf)
+                localized_name_offset = read_short(buf)  # relative to the extension start
             if extra_version >= 9:
                 unknown4 = read_int(buf)
             if extra_version >= 8:
                 unknown5 = read_int(buf)
             if extra_version >= 3:
                 self.full_name = read_cunicode(buf)
-                if long_string_size > 0:
+                if localized_name_offset > 0:
                     if extra_version >= 7:
                         self.localized_name = read_cunicode(buf)
                     else:
@@ -165,18 +165,17 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
             write_cstring(self.short_name, out, padding=True)
         extension_start = out.tell()
 
-        version = 3  # just hardcode some version
-        # structures below compatible with versions 3 and 9 in case someone needs it
-
+        version = 9 if self.localized_name is not None else 3
         # offset from start of size field until start of full_name
-        if version == 9:
-            offset_unicode = 0x2E
-        elif version == 3:
-            offset_unicode = 0x14
-        else:
-            raise NotImplementedError("Other versions not implemented yet")
+        offset_unicode = 0x2E if version == 9 else 0x14
+        full_name_bytes = self.full_name.encode('utf-16-le') + b'\x00\x00'
+        localized_name_bytes = (
+            self.localized_name.encode('utf-16-le') + b'\x00\x00'
+            if self.localized_name is not None else b''
+        )
+        localized_name_offset = offset_unicode + len(full_name_bytes) if self.localized_name is not None else 0
 
-        size = offset_unicode + len(self.full_name.encode('utf-16-le')) + 2 + 2
+        size = offset_unicode + len(full_name_bytes) + len(localized_name_bytes) + 2
         write_short(size, out)  # size
         write_short(version, out)  # version
         write_int(0xBEEF0004, out)  # signature
@@ -187,12 +186,12 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
             write_short(0, out)  # offset_ansi
             write_double(0, out)  # file_reference
             write_double(0, out)  # unknown2
-        offset_ansi = 0  # we always write unicode
-        write_short(offset_ansi, out)  # long_string_size
+        write_short(localized_name_offset, out)
         if version >= 9:
             write_int(0, out)  # unknown4
             write_int(0, out)  # unknown5
-        write_cunicode(self.full_name, out)
+        out.write(full_name_bytes)
+        out.write(localized_name_bytes)
         # The enclosing ItemID size word is outside this buffer but included in the offset.
         write_short(extension_start + 2, out)
         return out.getvalue()

@@ -118,7 +118,7 @@ def _shell_item_semantics(item: IDListEntry) -> dict[str, object]:
     """Capture immutable values before serialization can normalize a mutable segment."""
     values: dict[str, object] = {'class': type(item)}
     if isinstance(item, PathSegmentFileOrFolderEntry):
-        fields = ('file_size', 'created', 'modified', 'accessed', 'short_name', 'full_name')
+        fields = ('file_size', 'created', 'modified', 'accessed', 'short_name', 'full_name', 'localized_name')
         values.update({field: getattr(item, field) for field in fields})
         values.update(is_file=item.flags.IsFile, is_directory=item.flags.IsDirectory)
     elif isinstance(item, RootEntry):
@@ -152,10 +152,6 @@ def test_shell_item_metadata_survives_roundtrip(examples_path: str, filename: st
     assert [_shell_item_semantics(item) for item in restored.shell_item_id_list.items] == expected
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason='Path-segment serialization drops the localized name from its extension block.',
-)
 def test_localized_names_survive_roundtrip(examples_path: str) -> None:
     """Explorer display-name references are supported metadata, not disposable padding."""
     original = Lnk.from_file(str(Path(examples_path) / 'local_emoji.lnk'))
@@ -163,6 +159,7 @@ def test_localized_names_survive_roundtrip(examples_path: str) -> None:
         item.localized_name for item in original.shell_item_id_list.items
         if isinstance(item, PathSegmentFileOrFolderEntry)
     ]
+    assert expected == [None, '@shell32.dll,-21816', None, None]
     restored = Lnk.from_bytes(original.bytes())
     assert [
         item.localized_name for item in restored.shell_item_id_list.items
