@@ -62,6 +62,7 @@ def test_cli_local_link_type(
     lnk = Lnk.from_file(temp_filename)
     check_segment_type(lnk.shell_item_id_list.items[-2], False)
     check_segment_type(lnk.shell_item_id_list.items[-1], last_entry_file)
+    assert lnk.file_flags.directory is not last_entry_file
 
 
 def test_cli_create_net(temp_filename: str) -> None:

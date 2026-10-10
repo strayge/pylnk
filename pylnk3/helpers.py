@@ -60,6 +60,7 @@ def for_file(
     lnk.link_info = None
     if target_file.startswith('\\\\'):
         # remote link
+        lnk.file_flags.directory = is_file is False
         lnk.link_info = LinkInfo()
         lnk.link_info.remote = 1
         # extract server + share name from full path
@@ -80,11 +81,13 @@ def for_file(
             RootEntry(ROOT_MY_COMPUTER),
             DriveEntry(levels[0]),
         ]
+        lnk.file_flags.directory = True
         for level in levels[1:]:
             is_last_level = level == levels[-1]
             # consider all segments before last as directory
             segment = PathSegmentFileOrFolderEntry.create_for_path(level, is_file=is_file if is_last_level else False)
             elements.append(segment)
+            lnk.file_flags.directory = segment.flags.IsDirectory
         lnk.shell_item_id_list = LinkTargetIDList()
         lnk.shell_item_id_list.items = elements
     # lnk.link_flags.HasLinkInfo = True

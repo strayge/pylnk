@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import datetime
 from struct import unpack_from
+from unittest.mock import patch
 
 import pytest
 
@@ -31,6 +32,23 @@ def test_for_file_directory_separator(temp_filename: str, target: str, expected:
     lnk = for_file(target, lnk_name=temp_filename, is_file=False)
     assert lnk.path == expected
     assert Lnk.from_file(temp_filename).path == expected
+
+
+@pytest.mark.parametrize(('target', 'is_file', 'is_directory'), [
+    (r'C:\folder', None, True),
+    (r'C:\folder\file.txt', None, False),
+    ('C:\\', None, True),
+    (r'\\SERVER\SHARE\folder', False, True),
+    (r'\\SERVER\SHARE\file.txt', True, False),
+])
+def test_for_file_header_classification(target: str, is_file: bool | None, is_directory: bool) -> None:
+    """Header attributes must agree with the target type even without local filesystem metadata."""
+    with patch('pylnk3.structures.id_list.path.os.stat', side_effect=FileNotFoundError):
+        lnk = for_file(target, is_file=is_file)
+    assert lnk.file_flags.directory is is_directory
+    data = lnk.bytes()
+    assert bool(unpack_from('<I', data, 0x18)[0] & 0x10) is is_directory
+    assert Lnk.from_bytes(data).file_flags.directory is is_directory
 
 
 @pytest.mark.parametrize('drive', ['C:', 'c:\\'])
@@ -160,6 +178,7 @@ def test_for_file_explicit_type_override(name: str, is_file: bool) -> None:
     path = f'C:\\folder\\{name}'
     parsed = Lnk.from_bytes(for_file(path, is_file=is_file).bytes())
     assert parsed.path == path
+    assert parsed.file_flags.directory is not is_file
     parent, target = parsed.shell_item_id_list.items[-2:]
     assert isinstance(parent, PathSegmentFileOrFolderEntry)
     assert isinstance(target, PathSegmentFileOrFolderEntry)
