@@ -25,6 +25,9 @@ from pylnk3.structures.id_list.root import ROOT_MY_COMPUTER, ROOT_UWP_APPS
 
 def path_levels(p: str) -> Iterable[str]:
     dirname, base = ntpath.split(p)
+    if not base and dirname != p:
+        yield from path_levels(dirname)
+        return
     if base != '':
         yield from path_levels(dirname)
     yield p

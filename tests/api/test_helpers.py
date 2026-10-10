@@ -18,6 +18,21 @@ def test_helpers_for_file(temp_filename: str) -> None:
     assert lnk2.path == path
 
 
+@pytest.mark.parametrize(('target', 'expected'), [
+    ('C:\\folder\\', r'C:\folder'),
+    ('C:/folder/', r'C:\folder'),
+    ('C:\\', 'C:'),
+    ('C:/', 'C:'),
+    ('\\\\SERVER\\SHARE\\', '\\\\SERVER\\SHARE\\'),
+    ('\\\\SERVER\\SHARE\\folder\\', '\\\\SERVER\\SHARE\\folder\\'),
+])
+def test_for_file_directory_separator(temp_filename: str, target: str, expected: str) -> None:
+    """A trailing separator must not turn a directory into a malformed drive entry."""
+    lnk = for_file(target, lnk_name=temp_filename, is_file=False)
+    assert lnk.path == expected
+    assert Lnk.from_file(temp_filename).path == expected
+
+
 @pytest.mark.parametrize('drive', ['C:', 'c:\\'])
 def test_from_segment_list_absolute_path(temp_filename: str, drive: str) -> None:
     """Textual drives must build an absolute target before and after saving the shortcut."""

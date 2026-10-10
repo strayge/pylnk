@@ -51,6 +51,7 @@ def test_cli_create_local_file_unicode(temp_filename: str) -> None:
         ('C:\\folder\\file.txt', (), True),
         ('C:\\folder\\folder', (), False),
         ('C:\\folder\\folder.with.txt', ('--directory',), False),
+        ('C:\\folder\\trailing\\', ('--directory',), False),
         ('C:\\folder\\file_without_txt', ('--file',), True),
     ),
 )
