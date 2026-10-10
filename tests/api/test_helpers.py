@@ -17,6 +17,32 @@ def test_helpers_for_file(temp_filename: str) -> None:
     assert lnk2.path == path
 
 
+@pytest.mark.parametrize('drive', ['C:', 'c:\\'])
+def test_from_segment_list_absolute_path(temp_filename: str, drive: str) -> None:
+    """Textual drives must build an absolute target before and after saving the shortcut."""
+    timestamp = datetime(2020, 6, 8, 10, 12, 14)
+    lnk = from_segment_list([
+        drive,
+        {
+            'type': 'FOLDER',
+            'name': 'folder',
+            'created': timestamp,
+            'modified': timestamp,
+            'accessed': timestamp,
+        },
+        {
+            'type': 'FILE',
+            'name': 'file.txt',
+            'size': 823,
+            'created': timestamp,
+            'modified': timestamp,
+            'accessed': timestamp,
+        },
+    ], lnk_name=temp_filename)
+    assert lnk.path == r'C:\folder\file.txt'
+    assert Lnk.from_file(temp_filename).path == r'C:\folder\file.txt'
+
+
 @pytest.mark.parametrize('segment_type', ['FOLDER', 'TYPE_FOLDER'])
 def test_from_segment_list_folder_without_size(segment_type: str) -> None:
     """Relative folders may omit file size without needing a drive entry."""

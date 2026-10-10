@@ -145,7 +145,7 @@ def from_segment_list(
         entries.append(RootEntry(ROOT_MY_COMPUTER))
         if not data[0].endswith('\\'):
             data[0] += "\\"
-        drive = data[0].encode("ascii")
+        drive = data[0]
         data.pop(0)
         entries.append(DriveEntry(drive))
     data_without_root: List[Dict[str, Any]] = data  # type: ignore
