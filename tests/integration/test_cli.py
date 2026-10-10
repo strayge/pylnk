@@ -86,6 +86,8 @@ def test_cli_parse(examples_path: str) -> None:
     path = os.path.join(examples_path, 'local_file.lnk')
     output = call_cli('p', path)
     assert 'Path: C:\\Windows\\explorer.exe' in output
+    assert '<PathSegmentFileOrFolderEntry: Windows (FOLDER)>' in output
+    assert '<PathSegmentFileOrFolderEntry: explorer.exe (FILE)>' in output
 
 
 @pytest.mark.parametrize(

@@ -252,7 +252,10 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         return entry
 
     def __str__(self) -> str:
-        return "<PathSegmentFileOrFolderEntry: %s>" % self.full_name
+        entry_type = self.type
+        if self.flags.IsDirectory != self.flags.IsFile:
+            entry_type = 'FOLDER' if self.flags.IsDirectory else 'FILE'
+        return f"<PathSegmentFileOrFolderEntry: {self.full_name} ({entry_type})>"
 
     def json(self) -> dict:
         return {

@@ -7,6 +7,24 @@ import pytest
 from pylnk3.structures.id_list.path import PathSegmentFileOrFolderEntry
 
 
+@pytest.mark.parametrize(('flags', 'label'), [
+    (0x01, 'FOLDER'),
+    (0x02, 'FILE'),
+    (0x05, 'FOLDER'),
+    (0x06, 'FILE'),
+    (0x00, 'FILE_OR_FOLDER'),
+    (0x03, 'FILE_OR_FOLDER'),
+])
+def test_segment_text_classification(flags: int, label: str) -> None:
+    """Diagnostics must use classification flags without guessing from names or changing metadata."""
+    entry = PathSegmentFileOrFolderEntry()
+    entry.full_name = 'entry.txt'
+    entry.flags.set_flags(flags)
+    assert str(entry) == f'<PathSegmentFileOrFolderEntry: entry.txt ({label})>'
+    assert entry.type == 'FILE_OR_FOLDER'
+    assert entry.flags.bytes == flags
+
+
 def _segment_bytes(
     short_name: str, full_name: str, is_file: bool = False, localized_name: str | None = None,
 ) -> bytes:
