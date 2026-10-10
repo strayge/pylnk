@@ -50,15 +50,7 @@ def test_segment_payload(
     assert len(data) - extension_start == 20 + len(long_bytes) + 2
 
 
-@pytest.mark.parametrize('is_file', [
-    False,
-    pytest.param(
-        True, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError,
-            reason='File shell items incorrectly set the directory file attribute.',
-        ),
-    ),
-], ids=['directory', 'file'])
+@pytest.mark.parametrize('is_file', [False, True], ids=['directory', 'file'])
 def test_segment_directory_attribute(is_file: bool) -> None:
     """The directory attribute must agree with the file-or-folder classification."""
     data = _segment_bytes('entry', 'entry', is_file)
@@ -67,27 +59,11 @@ def test_segment_directory_attribute(is_file: bool) -> None:
 
 
 @pytest.mark.parametrize(('short_name', 'full_name', 'short_byte_count'), [
-    pytest.param(
-        'folder', 'folder', 8, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='ASCII extension declares 38 bytes but emits 36',
-        ),
-    ),
-    pytest.param(
-        'PROGRA~1', 'Program Files', 10, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Distinct ASCII names declare 52 extension bytes but emit 50',
-        ),
-    ),
-    pytest.param(
-        '目录', '目录', 6, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='BMP long name reserves two extra extension bytes',
-        ),
-    ),
+    ('folder', 'folder', 8),
+    ('PROGRA~1', 'Program Files', 10),
+    ('目录', '目录', 6),
     ('📁', '📁', 6),
-    pytest.param(
-        '😀🚀', '😀🚀.txt', 10, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Two astral characters make the extension two bytes too short',
-        ),
-    ),
+    ('😀🚀', '😀🚀.txt', 10),
 ])
 def test_extension_size(short_name: str, full_name: str, short_byte_count: int) -> None:
     """The extension size includes its own field, Unicode terminator and trailing offset."""
@@ -100,16 +76,8 @@ def test_extension_size(short_name: str, full_name: str, short_byte_count: int) 
     ('folder', 8),
     ('a.txt', 6),
     ('目录', 6),
-    pytest.param(
-        '📁', 6, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Short-name offset omits one surrogate-pair code unit',
-        ),
-    ),
-    pytest.param(
-        '😀🚀', 10, marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Short-name offset omits two surrogate-pair code units',
-        ),
-    ),
+    ('📁', 6),
+    ('😀🚀', 10),
 ])
 def test_extension_trailing_offset(short_name: str, short_byte_count: int) -> None:
     """The trailing offset addresses the extension relative to the enclosing ItemID size field."""

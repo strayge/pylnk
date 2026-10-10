@@ -148,24 +148,22 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         assert self.file_size is not None
 
         out = BytesIO()
-        short_name_len = len(self.short_name) + 1
         try:
             self.flags.IsUnicode = False
             self.short_name.encode("ascii")
-            short_name_len += short_name_len % 2  # padding
         except (UnicodeEncodeError, UnicodeDecodeError):
             self.flags.IsUnicode = True
-            short_name_len = short_name_len * 2
 
         type_and_flags = _ENTRY_TYPE_IDS[self.type] | self.flags.bytes
         write_short(type_and_flags, out)
         write_int(self.file_size, out)
         write_dos_datetime(self.modified, out)
-        write_short(0x10, out)
+        write_short(0x10 if self.flags.IsDirectory else 0, out)
         if self.flags.IsUnicode:
             write_cunicode(self.short_name, out)
         else:
             write_cstring(self.short_name, out, padding=True)
+        extension_start = out.tell()
 
         version = 3  # just hardcode some version
         # structures below compatible with versions 3 and 9 in case someone needs it
@@ -178,7 +176,7 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         else:
             raise NotImplementedError("Other versions not implemented yet")
 
-        size = offset_unicode + 2 * (len(self.full_name) + 2) + 2  # full struct size
+        size = offset_unicode + len(self.full_name.encode('utf-16-le')) + 2 + 2
         write_short(size, out)  # size
         write_short(version, out)  # version
         write_int(0xBEEF0004, out)  # signature
@@ -195,8 +193,8 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
             write_int(0, out)  # unknown4
             write_int(0, out)  # unknown5
         write_cunicode(self.full_name, out)
-        offset_part2 = 0x0E + short_name_len
-        write_short(offset_part2, out)
+        # The enclosing ItemID size word is outside this buffer but included in the offset.
+        write_short(extension_start + 2, out)
         return out.getvalue()
 
     @property
