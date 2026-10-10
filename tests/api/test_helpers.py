@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime
 from struct import unpack_from
 
@@ -41,6 +42,27 @@ def test_from_segment_list_absolute_path(temp_filename: str, drive: str) -> None
     ], lnk_name=temp_filename)
     assert lnk.path == r'C:\folder\file.txt'
     assert Lnk.from_file(temp_filename).path == r'C:\folder\file.txt'
+
+
+@pytest.mark.parametrize('as_tuple', [False, True], ids=['list', 'tuple'])
+@pytest.mark.parametrize('drive', ['C:', 'c:\\'])
+def test_from_segment_list_preserves_input(drive: str, as_tuple: bool) -> None:
+    """Reusing a caller-owned sequence must not remove its drive or alter its metadata."""
+    timestamp = datetime(2020, 6, 8, 10, 12, 14)
+    data: list[str | dict[str, object]] = [drive, {
+        'type': 'FOLDER',
+        'name': 'folder',
+        'created': timestamp,
+        'modified': timestamp,
+        'accessed': timestamp,
+    }]
+    segments = tuple(data) if as_tuple else data
+    expected = deepcopy(segments)
+    for _ in range(2):
+        lnk = from_segment_list(segments)
+        assert segments == expected
+        assert lnk.path == r'C:\folder'
+        assert Lnk.from_bytes(lnk.bytes()).path == r'C:\folder'
 
 
 @pytest.mark.parametrize('segment_type', ['FOLDER', 'TYPE_FOLDER'])

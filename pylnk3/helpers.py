@@ -1,6 +1,6 @@
 import ntpath
 import re
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from pylnk3.structures import (
     DriveEntry, ExtraData, ExtraData_EnvironmentVariableDataBlock, IDListEntry, LinkInfo,
@@ -106,7 +106,7 @@ def for_file(
 
 
 def from_segment_list(
-    data: List[Union[str, Dict[str, Any]]],
+    data: Union[List[Union[str, Dict[str, Any]]], Tuple[Union[str, Dict[str, Any]], ...]],
     lnk_name: Optional[str] = None,
 ) -> Lnk:
     """
@@ -137,6 +137,7 @@ def from_segment_list(
     """
     if not isinstance(data, (list, tuple)):
         raise ValueError("Invalid data format, list or tuple expected")
+    data = list(data)
     lnk = Lnk()
     entries: List[IDListEntry] = []
     if is_drive(data[0]):
