@@ -72,6 +72,16 @@ def test_cli_create_net(temp_filename: str) -> None:
     assert Lnk.from_file(temp_filename).path == path
 
 
+def test_cli_negative_icon_index(temp_filename: str) -> None:
+    """CLI creation and property output must preserve negative icon resource identifiers."""
+    icon = r'C:\Windows\System32\shell32.dll'
+    call_cli('create', r'C:\app.exe', temp_filename, '--icon', icon, '--icon-index', '-1')
+    restored = Lnk.from_file(temp_filename)
+    assert restored.icon == icon
+    assert restored.icon_index == -1
+    assert call_cli('parse', temp_filename, 'icon_index').strip() == '-1'
+
+
 def test_cli_parse(examples_path: str) -> None:
     path = os.path.join(examples_path, 'local_file.lnk')
     output = call_cli('p', path)

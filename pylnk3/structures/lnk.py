@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from io import BufferedIOBase, BufferedReader, BytesIO
+from struct import pack, unpack
 from typing import Optional, Union
 
 from pylnk3.exceptions import FormatException, InvalidKeyException
@@ -106,7 +107,7 @@ class Lnk(Serializable):
         self.access_time = convert_time_to_unix(read_double(lnk))
         self.modification_time = convert_time_to_unix(read_double(lnk))
         self.file_size = read_int(lnk)
-        self.icon_index = read_int(lnk)
+        self.icon_index = unpack('<i', lnk.read(4))[0]
         show_command = read_int(lnk)
         self._show_command = _SHOW_COMMANDS[show_command] if show_command in _SHOW_COMMANDS else _SHOW_COMMANDS[1]
         self.hot_key = self._read_hot_key(lnk)
@@ -161,7 +162,7 @@ class Lnk(Serializable):
         write_double(convert_time_to_windows(self.access_time), lnk)
         write_double(convert_time_to_windows(self.modification_time), lnk)
         write_int(self.file_size, lnk)
-        write_int(self.icon_index, lnk)
+        lnk.write(pack('<i', self.icon_index))
         write_int(_SHOW_COMMAND_IDS[self._show_command], lnk)
         self._write_hot_key(self.hot_key, lnk)
         lnk.write(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')  # reserved

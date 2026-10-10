@@ -19,6 +19,16 @@ def test_helpers_for_file(temp_filename: str) -> None:
     assert lnk2.path == path
 
 
+def test_for_file_negative_icon_index(temp_filename: str) -> None:
+    """A negative resource identifier must survive public helper creation and saving."""
+    icon = r'C:\Windows\System32\shell32.dll'
+    lnk = for_file(r'C:\app.exe', lnk_name=temp_filename, icon_file=icon, icon_index=-101)
+    assert lnk.icon_index == -101
+    restored = Lnk.from_file(temp_filename)
+    assert restored.icon == icon
+    assert restored.icon_index == -101
+
+
 @pytest.mark.parametrize(('target', 'expected'), [
     ('C:\\folder\\', r'C:\folder'),
     ('C:/folder/', r'C:\folder'),
