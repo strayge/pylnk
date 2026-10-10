@@ -100,6 +100,10 @@ split single `pylnk3.py` to separated modules
 [FIX] fixed building links for non-existing locally paths (guessing target type by dot in name)  
 added `--file` / `--directory` create command options to override target type guessing  
 
+**0.4.3**
+
+remove unnecessary print
+
 **0.4.2**  
 changed logic for Lnk.path choose (in case of different paths presents at different structures)  
 read links with root as GUID of KNOWN_FOLDER  
