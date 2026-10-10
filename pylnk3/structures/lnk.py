@@ -9,6 +9,7 @@ from pylnk3.structures.base import Serializable
 from pylnk3.structures.extra_data import ExtraData, ExtraData_EnvironmentVariableDataBlock
 from pylnk3.structures.id_list.id_list import LinkTargetIDList
 from pylnk3.structures.link_info import DRIVE_UNKNOWN, LinkInfo
+from pylnk3.utils import read_write
 from pylnk3.utils.data import convert_time_to_unix, convert_time_to_windows
 from pylnk3.utils.read_write import (
     read_byte, read_double, read_int, read_short, read_sized_string, write_byte, write_double,
@@ -318,12 +319,16 @@ class Lnk(Serializable):
         return lnk.getvalue()
 
     def json(self) -> dict:
+        def string_data_text(value: Optional[Union[str, bytes]]) -> Optional[str]:
+            """Keep parsed ANSI bytes intact while exposing text under the runtime charset."""
+            return value.decode(read_write.DEFAULT_CHARSET) if isinstance(value, bytes) else value
+
         return {
-            'description': self.description if self.link_flags.HasName else None,
-            'relative_path': self.relative_path if self.link_flags.HasRelativePath else None,
-            'work_dir': self.work_dir if self.link_flags.HasWorkingDir else None,
-            'arguments': self.arguments if self.link_flags.HasArguments else None,
-            'icon': self.icon if self.link_flags.HasIconLocation else None,
+            'description': string_data_text(self.description) if self.link_flags.HasName else None,
+            'relative_path': string_data_text(self.relative_path) if self.link_flags.HasRelativePath else None,
+            'work_dir': string_data_text(self.work_dir) if self.link_flags.HasWorkingDir else None,
+            'arguments': string_data_text(self.arguments) if self.link_flags.HasArguments else None,
+            'icon': string_data_text(self.icon) if self.link_flags.HasIconLocation else None,
             'window_mode': self._show_command,
             'hotkey': self.hot_key,
             'creation_time': self.creation_time.isoformat() if self.creation_time else None,
@@ -331,7 +336,7 @@ class Lnk(Serializable):
             'access_time': self.access_time.isoformat() if self.access_time else None,
             'file_size': self.file_size,
             'file_flags': self.file_flags.json(),
-            'link_info': self._link_info.json(),
+            'link_info': self._link_info.json() if self._link_info is not None else None,
             'link_flags': self.link_flags.json(),
             'shell_item_id_list': self.shell_item_id_list.json() if self.link_flags.HasLinkTargetIDList else None,
             'extra_data': self.extra_data.json() if self.extra_data else None,

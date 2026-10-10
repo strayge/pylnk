@@ -78,16 +78,7 @@ def test_cli_parse(examples_path: str) -> None:
 
 @pytest.mark.parametrize(
     'is_unicode',
-    (
-        True,
-        pytest.param(
-            False,
-            marks=pytest.mark.xfail(
-                strict=True, raises=subprocess.CalledProcessError,
-                reason='ANSI StringData is bytes, which the JSON CLI cannot serialize.',
-            ),
-        ),
-    ),
+    (True, False),
     ids=('unicode', 'ansi'),
 )
 def test_cli_json_stringdata(temp_filename: str, is_unicode: bool) -> None:
@@ -96,11 +87,6 @@ def test_cli_json_stringdata(temp_filename: str, is_unicode: bool) -> None:
     lnk.link_flags.IsUnicode = is_unicode
     lnk.description = 'hello'
     lnk.save(temp_filename)
-    try:
-        output = call_cli('parse', temp_filename, '--json')
-    except subprocess.CalledProcessError as error:
-        if 'TypeError: Object of type bytes is not JSON serializable' not in error.stderr:
-            pytest.fail(f'Unexpected JSON CLI failure:\n{error.stderr}')
-        raise
+    output = call_cli('parse', temp_filename, '--json')
     result = json.loads(output)
     assert result['description'] == 'hello'

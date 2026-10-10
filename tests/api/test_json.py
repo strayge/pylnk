@@ -1,10 +1,12 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from struct import pack
 
 import pytest
 
 from pylnk3 import Lnk, for_file
+from pylnk3.utils import read_write
 
 
 @pytest.mark.parametrize('filename', [
@@ -113,11 +115,6 @@ def test_json_present_optional_sections() -> None:
     }]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AttributeError,
-    reason="JSON dereferences absent LinkInfo on directly constructed local helper results",
-)
 def test_json_direct_local_helper() -> None:
     """A local helper result must be JSON-compatible before any binary roundtrip."""
     lnk = for_file('C:\\folder\\file.txt')
@@ -139,11 +136,6 @@ def test_json_parsed_local_helper() -> None:
     assert segments[1]['flags']['IsFile'] is True
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=TypeError,
-    reason="Parsed ANSI StringData retains bytes that json.dumps cannot serialize",
-)
 def test_json_parsed_ansi_description() -> None:
     """A valid ANSI description should be exposed as JSON text rather than bytes."""
     lnk = Lnk()
@@ -153,6 +145,42 @@ def test_json_parsed_ansi_description() -> None:
     result = json.loads(json.dumps(parsed.json()))
     assert result['description'] == 'hello'
     assert result['link_flags']['IsUnicode'] is False
+
+
+@pytest.mark.parametrize(('field', 'flag', 'flag_bits'), [
+    ('description', 'HasName', 0x04),
+    ('relative_path', 'HasRelativePath', 0x08),
+    ('work_dir', 'HasWorkingDir', 0x10),
+    ('arguments', 'HasArguments', 0x20),
+    ('icon', 'HasIconLocation', 0x40),
+])
+def test_json_raw_ansi_stringdata(
+    monkeypatch: pytest.MonkeyPatch, field: str, flag: str, flag_bits: int,
+) -> None:
+    """JSON uses the current charset strictly without changing parsed bytes or flags."""
+    header = Lnk().bytes()[:76]
+    payload = b'caf\xe9'
+    raw = header[:20] + pack('<I', flag_bits) + header[24:]
+    raw += pack('<H', len(payload)) + payload + b'\x00\x00\x00\x00'
+    monkeypatch.setattr(read_write, 'DEFAULT_CHARSET', 'ascii')
+    parsed = Lnk.from_bytes(raw)
+    assert isinstance(getattr(parsed, field), bytes)
+    assert getattr(parsed, field) == payload
+
+    monkeypatch.setattr(read_write, 'DEFAULT_CHARSET', 'cp1252')
+    result = json.loads(json.dumps(parsed.json()))
+    assert result[field] == 'caf\xe9'
+    assert result['link_flags'][flag] is True
+    assert result['link_flags']['IsUnicode'] is False
+    assert isinstance(getattr(parsed, field), bytes)
+    assert getattr(parsed, field) == payload
+    assert parsed.link_flags.bytes == flag_bits
+
+    monkeypatch.setattr(read_write, 'DEFAULT_CHARSET', 'utf-8')
+    with pytest.raises(UnicodeDecodeError):
+        parsed.json()
+    assert getattr(parsed, field) == payload
+    assert parsed.link_flags.bytes == flag_bits
 
 
 @pytest.mark.parametrize('description', [

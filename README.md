@@ -19,6 +19,11 @@ Limitation: Windows knows lots of different types of shortcuts which all have
 different formats. This library currently only supports shortcuts to files and
 folders on the local machine.
 
+Parsed ANSI StringData values remain `bytes`. `Lnk.json()` (and CLI `--json`)
+decodes them strictly using the current `pylnk3.utils.read_write.DEFAULT_CHARSET`;
+configure it for the shortcut's charset before JSON conversion. Invalid bytes
+raise a decoding error rather than being replaced or guessed.
+
 ## CLI
 
 Mainly tool has two basic commands.
