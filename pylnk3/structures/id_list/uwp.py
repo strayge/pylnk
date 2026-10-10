@@ -83,7 +83,7 @@ class UwpSubBlock(Serializable):
         out = BytesIO()
         if self.value:
             if isinstance(self.value, str):
-                string_len = len(self.value) + 1
+                string_len = len(self.value.encode('utf-16-le')) // 2 + 1
 
                 write_byte(self.type, out)
                 write_int(0, out)

@@ -1,6 +1,6 @@
 import os
 
-from pylnk3 import Lnk
+from pylnk3 import Lnk, build_uwp
 from pylnk3.structures.id_list.root import ROOT_UWP_APPS
 from pylnk3.structures.id_list.uwp import UwpSegmentEntry
 
@@ -24,6 +24,22 @@ def get_sub_block_values(lnk: Lnk) -> list[tuple[str, list[tuple[int, str | byte
         (block.guid, [(sub_block.type, sub_block.value) for sub_block in block._blocks])
         for block in segment._blocks
     ]
+
+
+def test_build_uwp_unicode_paths(temp_filename: str) -> None:
+    """The public helper must retain supplementary characters in both optional path properties."""
+    family = 'Microsoft.WindowsCalculator_8wekyb3d8bbwe'
+    target = family + '!App'
+    location = 'C:\\apps\\😀'
+    logo = 'Assets\\😀🚀.png'
+    original = build_uwp(family, target, location=location, logo44x44=logo, lnk_name=temp_filename)
+    restored = Lnk.from_file(temp_filename)
+    assert get_sub_block_values(restored) == get_sub_block_values(original)
+    values = get_sub_blocks(restored)
+    assert values['PackageFamilyName'] == family
+    assert values['Target'] == target
+    assert values['Location'] == location
+    assert values['Square44x44Logo'] == logo
 
 
 def test_uwp_read(examples_path: str) -> None:
