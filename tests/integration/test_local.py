@@ -3,7 +3,9 @@ import os
 import pytest
 
 from pylnk3 import Lnk
-from pylnk3.structures.extra_data import ExtraData_Unparsed
+from pylnk3.structures.extra_data import ExtraData_PropertyStoreDataBlock, ExtraData_Unparsed
+from pylnk3.structures.id_list.path import PathSegmentFileOrFolderEntry
+from pylnk3.utils import read_write
 
 
 @pytest.mark.parametrize(
@@ -121,11 +123,61 @@ def test_local_thispc(examples_path: str, temp_filename: str) -> None:
 
 
 def test_local_unknown_extra(examples_path: str, temp_filename: str) -> None:
+    """Unknown extra-data blocks must retain their payload, not only their signature."""
     filename = os.path.join(examples_path, 'local_extra_0xa2000001.lnk')
     lnk = Lnk.from_file(filename)
+    assert lnk.extra_data
+    original_block = lnk.extra_data.blocks[0]
+    assert isinstance(original_block, ExtraData_Unparsed)
+    expected_payload = original_block.data
     lnk.save(temp_filename)
     lnk2 = Lnk.from_file(temp_filename)
     assert lnk2.extra_data
     extra_block = lnk2.extra_data.blocks[0]
     assert isinstance(extra_block, ExtraData_Unparsed)
     assert extra_block._signature == 0xA2000001
+    assert extra_block.data == expected_payload
+
+
+@pytest.mark.parametrize(('filename', 'leaf', 'short_name', 'unicode_link_info'), [
+    ('local_file_unicode.lnk', 'fileéö.txt', 'FILE~2.TXT', False),
+    ('local_file_2emoji.lnk', 'file🎂💔.txt', 'FILE~1.TXT', True),
+    ('local_file_unicode2.lnk', 'file漢字.txt', 'FILE~3.TXT', True),
+])
+def test_native_unicode_file_metadata(
+    examples_path: str, filename: str, leaf: str, short_name: str, unicode_link_info: bool,
+) -> None:
+    """Known source values must be checked before a roundtrip can conceal parser losses."""
+    lnk = Lnk.from_file(os.path.join(examples_path, filename))
+    path = 'C:\\dir\\subdir\\' + leaf
+    assert lnk.path == path
+    assert lnk.relative_path == '.\\' + leaf
+    assert lnk.work_dir == r'C:\dir\subdir'
+    assert lnk.link_flags.IsUnicode
+    assert lnk.link_info.local_base_path_unicode == (path if unicode_link_info else '')
+    assert lnk.link_info.local_base_path_suffix_unicode == ''
+
+    segments = [item for item in lnk.shell_item_id_list.items if isinstance(item, PathSegmentFileOrFolderEntry)]
+    assert tuple(item.full_name for item in segments) == ('dir', 'subdir', leaf)
+    assert tuple(item.short_name for item in segments) == ('dir', 'subdir', short_name)
+    assert all(not item.flags.IsUnicode for item in segments)
+    assert all(item.flags.IsDirectory and not item.flags.IsFile for item in segments[:-1])
+    assert segments[-1].flags.IsFile and not segments[-1].flags.IsDirectory
+    assert lnk.extra_data is not None
+    assert len(lnk.extra_data.blocks) == 2
+    tracker, properties = lnk.extra_data.blocks
+    assert isinstance(tracker, ExtraData_Unparsed)
+    assert tracker._signature == 0xA0000003
+    assert isinstance(properties, ExtraData_PropertyStoreDataBlock)
+    assert properties._signature == 0xA0000009
+
+
+def test_native_cp1252_link_info_path(examples_path: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """ANSI fields require the known source code page, which the shortcut does not identify."""
+    monkeypatch.setattr(read_write, 'DEFAULT_CHARSET', 'cp1252')
+    path = r'C:\dir\subdir\fileéö.txt'
+    lnk = Lnk.from_file(os.path.join(examples_path, 'local_file_unicode.lnk'))
+    assert lnk.link_info.local_base_path == path
+    restored = Lnk.from_bytes(lnk.bytes())
+    assert restored.path == path
+    assert restored.link_info.local_base_path == path
