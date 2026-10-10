@@ -3,15 +3,16 @@ import os
 from binascii import hexlify
 from datetime import datetime
 from io import BytesIO
+from struct import error as StructError
 from typing import Optional
 
-from pylnk3.exceptions import MissingInformationException
+from pylnk3.exceptions import FormatException, MissingInformationException
 from pylnk3.flags import Flags
 from pylnk3.structures.id_list.base import IDListEntry
 from pylnk3.utils.guid import bytes_from_guid, guid_from_bytes
 from pylnk3.utils.read_write import (
-    read_cstring, read_cunicode, read_dos_datetime, read_double, read_int, read_short,
-    write_cstring, write_cunicode, write_dos_datetime, write_double, write_int, write_short,
+    read_cstring, read_cunicode, read_dos_datetime, read_int, read_short, write_cstring,
+    write_cunicode, write_dos_datetime, write_double, write_int, write_short,
 )
 
 _ENTRY_TYPES = {
@@ -85,6 +86,8 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         self.short_name = None
         self.full_name = None
         self.localized_name = None
+        self._raw_item = bytes
+        self._original_state: Optional[tuple[object, ...]] = None
 
         if bytes is None:
             return
@@ -104,40 +107,65 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
             self.short_name = read_cunicode(buf)
         else:
             self.short_name = read_cstring(buf, padding=True)
-        extra_size = read_short(buf)
-        extra_version = read_short(buf)
-        extra_signature = read_int(buf)
-        if extra_signature == 0xBEEF0004:
-            # indicator_1 = read_short(buf)  # see below
-            # only_83 = read_short(buf) < 0x03
-            # unknown = read_short(buf)  # 0x04
-            # self.is_unicode = read_short(buf) == 0xBeef
-            self.created = read_dos_datetime(buf)  # 4 bytes
-            self.accessed = read_dos_datetime(buf)  # 4 bytes
-            offset_unicode = read_short(buf)   # offset from start of extra_size
-            # only_83_2 = offset_unicode >= indicator_1 or offset_unicode < 0x14
+        extension_data = bytes[buf.tell():]
+        try:
+            extension = BytesIO(extension_data)
+            extra_size = read_short(extension)
+            extra_version = read_short(extension)
+            extra_signature = read_int(extension)
+            header_size = {3: 20, 7: 38, 8: 42, 9: 46}.get(extra_version)
+            if extra_signature != 0xBEEF0004 or header_size is None:
+                raise ValueError('Unsupported file-entry extension')
+            if not header_size + 4 <= extra_size <= len(extension_data):
+                raise ValueError('Invalid file-entry extension size')
+            name_limit = extra_size - 2
+            first_extension_offset = int.from_bytes(extension_data[name_limit:extra_size], 'little')
+            if first_extension_offset != buf.tell() + 2:
+                raise ValueError('Invalid first-extension offset')
+            created = read_dos_datetime(extension)
+            accessed = read_dos_datetime(extension)
+            offset_unicode = read_short(extension)
             if extra_version >= 7:
-                offset_ansi = read_short(buf)
-                file_reference = read_double(buf)
-                unknown2 = read_double(buf)
-            localized_name_offset = 0
-            if extra_version >= 3:
-                localized_name_offset = read_short(buf)  # relative to the extension start
-            if extra_version >= 9:
-                unknown4 = read_int(buf)
-            if extra_version >= 8:
-                unknown5 = read_int(buf)
-            if extra_version >= 3:
-                self.full_name = read_cunicode(buf)
-                if localized_name_offset > 0:
-                    if extra_version >= 7:
-                        self.localized_name = read_cunicode(buf)
-                    else:
-                        self.localized_name = read_cstring(buf)
-                version_offset = read_short(buf)
+                extension.seek(18, 1)  # Reserved word, file reference, and another eight-byte field.
+            localized_name_offset = read_short(extension)
+            if not header_size <= offset_unicode <= name_limit - 2 or offset_unicode % 2:
+                raise ValueError('Invalid long-name offset')
+            if localized_name_offset:
+                width = 2 if extra_version >= 7 else 1
+                if not offset_unicode + 2 <= localized_name_offset <= name_limit - width:
+                    raise ValueError('Invalid localized-name offset')
+                if extra_version >= 7 and localized_name_offset % 2:
+                    raise ValueError('Unaligned localized-name offset')
+            full_name = read_cunicode(BytesIO(extension_data[offset_unicode:localized_name_offset or name_limit]))
+            localized_name = None
+            if localized_name_offset:
+                reader = read_cunicode if extra_version >= 7 else read_cstring
+                localized_name = reader(BytesIO(extension_data[localized_name_offset:name_limit]))
+        except (EOFError, StructError, ValueError):
+            # The primary name is usable even when optional extension metadata is not.
+            self._original_state = self._serialization_state()
+            return
+        self.created, self.accessed = created, accessed
+        self.full_name, self.localized_name = full_name, localized_name
+        if extra_size == len(extension_data):
+            self._raw_item = None
+        else:
+            # Keep additional, uninterpreted extension blocks instead of dropping them.
+            self._original_state = self._serialization_state()
+
+    def _serialization_state(self) -> tuple[object, ...]:
+        """Snapshot flag values as well as fields so opaque passthrough cannot silently lose edits."""
+        return (
+            self.type, self.flags.bytes, self.file_size, self.modified, self.created, self.accessed,
+            self.short_name, self.full_name, self.localized_name,
+        )
 
     @property
     def bytes(self) -> bytes:
+        if self._raw_item is not None:
+            if self._serialization_state() != self._original_state:
+                raise FormatException('Cannot serialize changes to a file entry with opaque extension data')
+            return self._raw_item
         self._validate()
         # explicit check to have strict types without optionals
         assert self.short_name is not None
@@ -198,7 +226,7 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
 
     @property
     def path(self) -> str:
-        return self.full_name or ''
+        return self.full_name or self.short_name or ''
 
     def _validate(self) -> None:
         if self.type is None:
@@ -255,7 +283,7 @@ class PathSegmentFileOrFolderEntry(PathSegmentEntry):
         entry_type = self.type
         if self.flags.IsDirectory != self.flags.IsFile:
             entry_type = 'FOLDER' if self.flags.IsDirectory else 'FILE'
-        return f"<PathSegmentFileOrFolderEntry: {self.full_name} ({entry_type})>"
+        return f"<PathSegmentFileOrFolderEntry: {self.path} ({entry_type})>"
 
     def json(self) -> dict:
         return {

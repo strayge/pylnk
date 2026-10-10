@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +26,44 @@ def test_local_mounted_share(examples_path: str, temp_filename: str, filename: s
     lnk.save(temp_filename)
     lnk2 = Lnk.from_file(temp_filename)
     assert lnk2.path == path
+
+
+@pytest.mark.parametrize('change_primary', [False, True], ids=['original', 'different-primary-names'])
+def test_invalid_file_entry_extension_primary_names(examples_path: str, temp_filename: str, change_primary: bool) -> None:
+    """Windows uses the primary names despite these inconsistent optional extension fields."""
+    fixture = Path(examples_path) / 'local_invalid_beef0004.lnk'
+    original_bytes = fixture.read_bytes()
+    data = bytearray(original_bytes)
+    names = ('Program Files', 'Markpad', 'Markpad.exe')
+    if change_primary:
+        for offset in (0x95, 0xDF, 0x11D):
+            data[offset] = ord('X')
+        names = ('Program FileX', 'MarkpaX', 'MarkpaX.exe')
+    expected_path = 'C:\\' + '\\'.join(names)
+    lnk = Lnk.from_bytes(bytes(data))
+    assert lnk.path == expected_path
+    assert lnk.work_dir == r'C:\Program Files\Markpad'
+    assert lnk.relative_path == './Markpad.exe'
+    assert not lnk.link_flags.HasLinkInfo
+    segments = lnk.shell_item_id_list.items[2:]
+    for segment, name, start, end in zip(segments, names, (0x7D, 0xCD, 0x10B), (0xCB, 0x109, 0x153), strict=True):
+        assert isinstance(segment, PathSegmentFileOrFolderEntry)
+        assert segment.short_name == name
+        assert segment.full_name is None
+        assert segment.localized_name is None
+        assert segment.created is None and segment.accessed is None
+        assert segment.bytes == data[start:end]
+    assert segments[0].flags.IsDirectory and segments[1].flags.IsDirectory
+    assert segments[2].flags.IsFile
+    lnk.arguments = '--example'
+    lnk.save(temp_filename)
+    restored = Lnk.from_file(temp_filename)
+    assert restored.arguments == '--example'
+    assert restored.path == expected_path
+    assert restored.work_dir == lnk.work_dir
+    assert restored.relative_path == lnk.relative_path
+    assert [item.bytes for item in restored.shell_item_id_list.items[2:]] == [item.bytes for item in segments]
+    assert fixture.read_bytes() == original_bytes
 
 
 def test_local_disk_link(examples_path: str, temp_filename: str) -> None:

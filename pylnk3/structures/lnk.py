@@ -139,6 +139,10 @@ class Lnk(Serializable):
         self.extra_data = ExtraData(lnk)
 
     def save(self, f: Optional[Union[str, BufferedIOBase]] = None, force_ext: bool = False) -> None:
+        """Finish serialization before opening a destination that an invalid edit could otherwise truncate."""
+        if f is None:
+            raise ValueError("No file specified for saving LNK file")
+        data = self.bytes()
         is_opened_here = False
         if isinstance(f, str):
             filename: str = f
@@ -146,9 +150,7 @@ class Lnk(Serializable):
                 filename += '.lnk'
             f = open(filename, 'wb')
             is_opened_here = True
-        if f is None:
-            raise ValueError("No file specified for saving LNK file")
-        self.write(f)
+        f.write(data)
         # only close the stream if it's our own
         if is_opened_here:
             f.close()

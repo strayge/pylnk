@@ -11,7 +11,7 @@ from pylnk3.structures import PathSegmentFileOrFolderEntry
 from pylnk3.structures.id_list.base import IDListEntry
 
 
-def call_cli(*params: str) -> str:
+def call_cli(*params: str, timeout: float | None = None) -> str:
     """Keep argument boundaries identical on Windows and POSIX shells."""
     project_root = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
@@ -20,7 +20,7 @@ def call_cli(*params: str) -> str:
     result = subprocess.run(
         [sys.executable, '-m', 'pylnk3', *params], check=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        cwd=project_root, env=env, text=True, encoding='utf-8',
+        cwd=project_root, env=env, text=True, encoding='utf-8', timeout=timeout,
     )
     return result.stdout
 
@@ -80,6 +80,13 @@ def test_cli_negative_icon_index(temp_filename: str) -> None:
     assert restored.icon == icon
     assert restored.icon_index == -1
     assert call_cli('parse', temp_filename, 'icon_index').strip() == '-1'
+
+
+def test_cli_parse_invalid_file_entry_extension(examples_path: str) -> None:
+    """The Windows-readable sample must resolve through the public CLI without hanging."""
+    filename = os.path.join(examples_path, 'local_invalid_beef0004.lnk')
+    output = call_cli('parse', filename, 'path', 'work_dir', timeout=5)
+    assert output.splitlines() == [r'C:\Program Files\Markpad\Markpad.exe', r'C:\Program Files\Markpad']
 
 
 def test_cli_parse(examples_path: str) -> None:

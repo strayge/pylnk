@@ -26,6 +26,8 @@ def read_cunicode(buf: BufferedIOBase) -> str:
     s = b""
     b = buf.read(2)
     while b != b'\x00\x00':
+        if len(b) != 2:
+            raise EOFError('Unexpected end of stream in a NUL-terminated UTF-16 string')
         s += b
         b = buf.read(2)
     return s.decode('utf-16-le')
@@ -35,6 +37,8 @@ def read_cstring(buf: BufferedIOBase, padding: bool = False) -> str:
     s = b""
     b = buf.read(1)
     while b != b'\x00':
+        if not b:
+            raise EOFError('Unexpected end of stream in a NUL-terminated byte string')
         s += b
         b = buf.read(1)
     if padding and not len(s) % 2:

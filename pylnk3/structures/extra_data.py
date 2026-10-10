@@ -404,12 +404,18 @@ class ExtraData(Serializable):
         if lnk is None:
             return
         while True:
-            size = read_int(lnk)
+            size_bytes = lnk.read(4)
+            if not size_bytes:
+                break
+            size = unpack('<I', size_bytes)[0]
             if size < 4:  # TerminalBlock
                 break
+            if size < 8:
+                raise ValueError('Invalid ExtraData block size')
             signature = read_int(lnk)
             bytes = lnk.read(size - 8)
-            # lnk.seek(-8, 1)
+            if len(bytes) != size - 8:
+                raise EOFError('Unexpected end of stream in an ExtraData block')
             block_type = EXTRA_DATA_TYPES.get(signature)
             if block_type in EXTRA_DATA_TYPES_CLASSES:
                 block_class = EXTRA_DATA_TYPES_CLASSES[block_type]

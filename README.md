@@ -28,6 +28,11 @@ Zero FILETIME timestamps are `None` in Python and `null` in JSON; writing `None`
 emits zero. Nonzero FILETIMEs use naive local datetimes with microsecond precision
 (the final 100-nanosecond digit is discarded).
 
+When optional shell-item metadata cannot be decoded, the primary name remains
+usable. Items retaining opaque extensions can be saved unchanged; editing those
+items raises `FormatException` instead of silently losing data. Shortcut-level
+fields such as arguments remain editable.
+
 ## CLI
 
 Mainly tool has two basic commands.

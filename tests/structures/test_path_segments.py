@@ -1,9 +1,10 @@
 from datetime import datetime
 from pathlib import Path
-from struct import pack, unpack_from
+from struct import pack, pack_into, unpack_from
 
 import pytest
 
+from pylnk3.exceptions import FormatException
 from pylnk3.structures.id_list.path import PathSegmentFileOrFolderEntry
 
 
@@ -40,6 +41,73 @@ def _segment_bytes(
     entry.created = datetime(2024, 1, 2, 3, 4, 0)
     entry.accessed = datetime(2024, 1, 2, 3, 4, 0)
     return entry.bytes
+
+
+def test_extension_name_offsets() -> None:
+    """Valid extension names take precedence over primary names, including gaps between fields."""
+    extension = (
+        pack('<HHI6H', 44, 3, 0xBEEF0004, 0, 0, 0, 0, 24, 36)
+        + b'\xaa' * 4 + b'L\x00o\x00n\x00g\x00\x00\x00'
+        + b'\xbb' * 2 + b'label\x00' + pack('<H', 20)
+    )
+    raw = pack('<HIHHH', 0x32, 7, 0, 0, 0x20) + b'SHORT\x00' + extension
+    entry = PathSegmentFileOrFolderEntry(raw)
+    assert entry.path == entry.full_name == 'Long'
+    assert entry.short_name == 'SHORT'
+    assert entry.localized_name == 'label'
+    restored = PathSegmentFileOrFolderEntry(entry.bytes)
+    assert restored.path == 'Long'
+    assert restored.localized_name == 'label'
+
+
+@pytest.mark.parametrize('damage', ['size', 'name-offset', 'localized-offset', 'terminator'])
+def test_unusable_extension_preserves_item(damage: str) -> None:
+    """Unusable optional metadata must not hide the primary name or be discarded on save."""
+    raw = bytearray(_segment_bytes('SHORT', 'Long'))
+    extension_start = 18
+    if damage == 'size':
+        pack_into('<H', raw, extension_start, len(raw))
+    elif damage == 'name-offset':
+        pack_into('<H', raw, extension_start + 16, 2)
+    elif damage == 'localized-offset':
+        pack_into('<H', raw, extension_start + 18, 20)
+    else:
+        raw[-4:-2] = b'X\x00'
+        raw.extend(b'\x00\x00')  # Outside the declared extension, not its missing terminator.
+    entry = PathSegmentFileOrFolderEntry(bytes(raw))
+    assert entry.path == entry.short_name == 'SHORT'
+    assert entry.full_name is None
+    assert entry.created is None and entry.accessed is None
+    assert entry.localized_name is None
+    assert entry.bytes == raw
+
+
+def test_following_opaque_extension_is_preserved() -> None:
+    """A recognized first extension must not cause additional unknown blocks to disappear."""
+    raw = _segment_bytes('SHORT', 'Long') + pack('<HHI', 8, 0, 0xBEEF9999)
+    entry = PathSegmentFileOrFolderEntry(raw)
+    assert entry.path == 'Long'
+    assert entry.bytes == raw
+
+
+@pytest.mark.parametrize('change_flags', [False, True], ids=['name', 'flags'])
+def test_opaque_item_edits_are_not_silently_lost(examples_path: str, change_flags: bool) -> None:
+    """Opaque passthrough must reject edits rather than ignore them or discard retained bytes."""
+    raw = (Path(examples_path) / 'local_invalid_beef0004.lnk').read_bytes()[0x7D:0xCB]
+    entry = PathSegmentFileOrFolderEntry(raw)
+    if change_flags:
+        entry.flags.IsDirectory = False
+    else:
+        entry.full_name = 'Changed'
+    with pytest.raises(FormatException, match='opaque'):
+        _ = entry.bytes
+
+
+def test_truncated_primary_name_is_not_recovered() -> None:
+    """The fallback applies to optional extensions, not an unreadable mandatory name."""
+    raw = pack('<HIHHH', 0x31, 0, 0, 0, 0x10) + b'unterminated'
+    with pytest.raises(EOFError):
+        PathSegmentFileOrFolderEntry(raw)
 
 
 @pytest.mark.parametrize(('short_name', 'full_name', 'is_file', 'short_bytes', 'unicode_flag'), [
