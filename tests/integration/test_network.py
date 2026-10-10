@@ -40,14 +40,10 @@ def test_network_lnk(examples_path: str, temp_filename: str, filename: str, path
 
 
 @pytest.mark.parametrize('filename,path', NETWORK_LINKS)
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason='LinkInfo serialization drops the network common path suffix.',
-)
 def test_network_target_survives_roundtrip(
     examples_path: str, temp_filename: str, filename: str, path: str,
 ) -> None:
-    """Keep the known target-loss defect visible without hiding environment checks."""
+    """Environment metadata must not mask loss of the selected network target."""
     lnk = Lnk.from_file(os.path.join(examples_path, filename))
     lnk.save(temp_filename)
     assert Lnk.from_file(temp_filename).path == path

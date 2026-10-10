@@ -64,18 +64,6 @@ def test_cli_local_link_type(
 
 
 def test_cli_create_net(temp_filename: str) -> None:
-    path = '\\\\192.168.1.1\\SHARE\\path\\file.txt'
-    share = '\\\\192.168.1.1\\SHARE\\'
-    call_cli('c', path, temp_filename)
-    lnk = Lnk.from_file(temp_filename)
-    assert lnk.path == share
-
-
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason='Network shortcut serialization drops the common path suffix.',
-)
-def test_cli_create_net_preserves_full_target(temp_filename: str) -> None:
     """A generated network shortcut must retain the path inside its share."""
     path = '\\\\192.168.1.1\\SHARE\\path\\file.txt'
     call_cli('c', path, temp_filename)

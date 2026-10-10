@@ -2,7 +2,6 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
-from struct import error as StructError
 from struct import unpack_from
 
 import pytest
@@ -26,22 +25,8 @@ _FIXTURE_NAMES = tuple(
 )
 assert _FIXTURE_NAMES, 'The integration corpus must not silently collect zero cases.'
 
-_LINK_INFO_FAILURES = {
-    'local_file_2emoji.lnk': pytest.mark.xfail(
-        strict=True, raises=StructError,
-        reason='Two non-BMP characters undersize Unicode LinkInfo and prevent reparsing.',
-    ),
-    'local_file_unicode2.lnk': pytest.mark.xfail(
-        strict=True, raises=AssertionError,
-        reason='BMP-only Unicode LinkInfo reserves unwritten bytes, corrupting subsequent metadata.',
-    ),
-}
-_METADATA_CASES = tuple(
-    pytest.param(name, marks=_LINK_INFO_FAILURES.get(name, ())) for name in _FIXTURE_NAMES
-)
 
-
-@pytest.mark.parametrize('filename', _METADATA_CASES)
+@pytest.mark.parametrize('filename', _FIXTURE_NAMES)
 def test_header_semantics_survive_roundtrip(examples_path: str, filename: str) -> None:
     """A correct target alone does not establish preservation of shortcut metadata."""
     original = Lnk.from_file(str(Path(examples_path) / filename))
@@ -60,7 +45,7 @@ def test_header_semantics_survive_roundtrip(examples_path: str, filename: str) -
     assert restored.link_flags.bytes & semantic_flags_mask == link_flags
 
 
-@pytest.mark.parametrize('filename', _METADATA_CASES)
+@pytest.mark.parametrize('filename', _FIXTURE_NAMES)
 def test_link_info_semantics_survive_roundtrip(examples_path: str, filename: str) -> None:
     """Alternate path representations must not disappear behind the selected target."""
     original = Lnk.from_file(str(Path(examples_path) / filename))
@@ -80,10 +65,6 @@ def test_link_info_semantics_survive_roundtrip(examples_path: str, filename: str
 @pytest.mark.parametrize(
     'filename', tuple(name for name in _FIXTURE_NAMES if name.startswith(('net_', 'mounted_'))),
 )
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason='LinkInfo serialization discards the common path suffix on network records.',
-)
 def test_network_link_info_suffix_survives_roundtrip(examples_path: str, filename: str) -> None:
     """Mounted links can retain their selected target while losing the network path."""
     original = Lnk.from_file(str(Path(examples_path) / filename))
@@ -92,7 +73,7 @@ def test_network_link_info_suffix_survives_roundtrip(examples_path: str, filenam
     assert restored.link_info.base_name == expected_suffix
 
 
-@pytest.mark.parametrize('filename', _METADATA_CASES)
+@pytest.mark.parametrize('filename', _FIXTURE_NAMES)
 def test_extra_data_semantics_survive_roundtrip(examples_path: str, filename: str) -> None:
     """Known values and opaque payloads must survive independently of binary packing."""
     original = Lnk.from_file(str(Path(examples_path) / filename))
@@ -167,9 +148,6 @@ def test_shell_item_metadata_survives_roundtrip(examples_path: str, filename: st
         assert not restored.link_flags.HasLinkTargetIDList
         return
     expected = [_shell_item_semantics(item) for item in original.shell_item_id_list.items]
-    if filename == 'local_file_2emoji.lnk':
-        # Only this LinkInfo layout prevents reparsing otherwise readable shell metadata.
-        original.link_flags.HasLinkInfo = False
     restored = Lnk.from_bytes(original.bytes())
     assert [_shell_item_semantics(item) for item in restored.shell_item_id_list.items] == expected
 

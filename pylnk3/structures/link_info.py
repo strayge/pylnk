@@ -3,6 +3,7 @@ from typing import Optional
 
 from pylnk3.exceptions import MissingInformationException
 from pylnk3.structures.base import Serializable
+from pylnk3.utils import read_write
 from pylnk3.utils.read_write import (
     read_cstring, read_cunicode, read_int, write_byte, write_cstring, write_cunicode, write_int,
 )
@@ -144,15 +145,16 @@ class LinkInfo(Serializable):
             self.header_size += 8
 
         # sizes
-        size_base_name = 1  # len(self.base_name) + 1  # zero terminated strings
+        size_base_name = 1
         if self.remote:
-            self.size_network_volume_table = 20 + len(self.network_share_name) + len(self.base_name) + 1
+            self.size_network_volume_table = 20 + len(self.network_share_name.encode(read_write.DEFAULT_CHARSET)) + 1
+            size_base_name = len(self.base_name.encode(read_write.DEFAULT_CHARSET)) + 1
         else:
-            self.size_local_volume_table = 16 + len(self.volume_label) + 1
-            size_local_base_path = len(self.local_base_path) + 1
+            self.size_local_volume_table = 16 + len(self.volume_label.encode(read_write.DEFAULT_CHARSET)) + 1
+            size_local_base_path = len(self.local_base_path.encode(read_write.DEFAULT_CHARSET)) + 1
         if self.local_base_path_unicode:
-            size_local_base_path_unicode = len(self.local_base_path_unicode) * 2 + 4
-            size_local_base_path_suffix_unicode = len(self.local_base_path_suffix_unicode) * 2 + 2
+            size_local_base_path_unicode = len(self.local_base_path_unicode.encode('utf-16-le')) + 2
+            size_local_base_path_suffix_unicode = len(self.local_base_path_suffix_unicode.encode('utf-16-le')) + 2
 
         # offsets
         offset = self.header_size

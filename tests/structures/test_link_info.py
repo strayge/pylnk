@@ -5,6 +5,7 @@ from struct import pack, unpack_from
 import pytest
 
 from pylnk3.structures.link_info import DRIVE_FIXED, LinkInfo
+from pylnk3.utils import read_write
 
 
 def _local_record(base_unicode: str = '', suffix_unicode: str = '') -> bytes:
@@ -53,7 +54,7 @@ def test_ascii_local_layout() -> None:
     (r'C:\📁', '😀🚀'),
 ])
 def test_unicode_local_payload(base: str, suffix: str) -> None:
-    """UTF16 payloads remain correct even when advertised lengths or offsets are wrong."""
+    """Raw payload boundaries must match the supported ANSI and UTF16 ordering."""
     data = _local_record(base, suffix)
     path = b'C:\\file.txt\x00'
     base_bytes = base.encode('utf-16-le') + b'\x00\x00'
@@ -71,26 +72,9 @@ def test_unicode_local_payload(base: str, suffix: str) -> None:
 
 
 @pytest.mark.parametrize('invariant', ['size', 'suffix_offset', 'suffix_payload'])
-@pytest.mark.parametrize('base', [
-    pytest.param(
-        r'C:\folder', marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='ASCII base reserves two extra UTF16 bytes',
-        ),
-    ),
-    pytest.param(
-        r'C:\café', marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='BMP base reserves two extra UTF16 bytes',
-        ),
-    ),
-    r'C:\📁',
-    pytest.param(
-        r'C:\📁📂', marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Two astral characters leave the base two bytes short',
-        ),
-    ),
-])
+@pytest.mark.parametrize('base', [r'C:\folder', r'C:\café', r'C:\📁', r'C:\📁📂'])
 def test_unicode_base_layout(base: str, invariant: str) -> None:
-    """Isolate each header invariant so one known failure cannot hide another check."""
+    """Isolate header invariants so a size check cannot hide an incorrect offset."""
     data = _local_record(base, 'leaf.txt')
     base_bytes = base.encode('utf-16-le') + b'\x00\x00'
     suffix_bytes = b'l\x00e\x00a\x00f\x00.\x00t\x00x\x00t\x00\x00\x00'
@@ -106,25 +90,78 @@ def test_unicode_base_layout(base: str, invariant: str) -> None:
         assert data[suffix_offset:suffix_offset + len(suffix_bytes)] == suffix_bytes
 
 
-@pytest.mark.parametrize('suffix', [
-    '',
-    'leaf.txt',
-    'résumé',
-    pytest.param(
-        '😀', marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Suffix sizing counts characters instead of UTF16 code units',
-        ),
-    ),
-    pytest.param(
-        '😀🚀', marks=pytest.mark.xfail(
-            strict=True, raises=AssertionError, reason='Suffix sizing omits both surrogate-pair code units',
-        ),
-    ),
-])
+@pytest.mark.parametrize('suffix', ['', 'leaf.txt', 'résumé', '😀', '😀🚀'])
 def test_unicode_suffix_size(suffix: str) -> None:
-    """A single astral base cancels its sizing defect, exposing suffix sizing independently."""
+    """Vary suffix code-unit counts independently of a fixed astral base."""
     data = _local_record(r'C:\📁', suffix)
-    assert unpack_from('<I', data)[0] == len(data)
+    suffix_bytes = suffix.encode('utf-16-le') + b'\x00\x00'
+    suffix_offset = unpack_from('<I', data, 0x20)[0]
+    ansi_suffix_offset = unpack_from('<I', data, 0x18)[0]
+    assert ansi_suffix_offset == suffix_offset + len(suffix_bytes)
+    assert data[suffix_offset:ansi_suffix_offset] == suffix_bytes
+    assert data[ansi_suffix_offset:] == b'\x00'
+    assert unpack_from('<I', data)[0] == len(data) == ansi_suffix_offset + 1
+
+
+@pytest.mark.parametrize(('charset', 'share', 'suffix'), [
+    ('cp1251', r'\\server\share', ''),
+    ('cp1251', r'\\server\share', r'folder\nested\file.txt'),
+    ('cp1252', r'\\server\café', r'dossier\résumé.txt'),
+    ('utf-8', r'\\server\café', r'dossier\résumé.txt'),
+])
+def test_network_layout(monkeypatch: pytest.MonkeyPatch, charset: str, share: str, suffix: str) -> None:
+    """The table ends at the share terminator, not at the separate common suffix."""
+    monkeypatch.setattr(read_write, 'DEFAULT_CHARSET', charset)
+    info = LinkInfo()
+    info.remote = 1
+    info.network_share_name = share
+    info.base_name = suffix
+    stream = BytesIO()
+    info.write(stream)
+    data = stream.getvalue()
+    share_bytes = share.encode(charset) + b'\x00'
+    suffix_bytes = suffix.encode(charset) + b'\x00'
+    table = pack('<5I', 20 + len(share_bytes), 2, 20, 0, 0x20000) + share_bytes
+    size, header_size, flags, volume_offset, path_offset, network_offset, suffix_offset = unpack_from('<7I', data)
+
+    assert header_size == 0x1C
+    assert flags == 2
+    assert volume_offset == path_offset == 0
+    assert network_offset == header_size
+    assert unpack_from('<I', data, network_offset)[0] == 20 + len(share_bytes)
+    assert suffix_offset == network_offset + len(table)
+    assert size == len(data) == suffix_offset + len(suffix_bytes)
+    assert data[network_offset:suffix_offset] == table
+    assert data[suffix_offset:] == suffix_bytes
+
+
+def test_local_ansi_charset_layout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Runtime multibyte encoding must size both the volume label and ANSI path."""
+    monkeypatch.setattr(read_write, 'DEFAULT_CHARSET', 'utf-8')
+    info = LinkInfo()
+    info.local = 1
+    info.drive_type = DRIVE_FIXED
+    info.drive_serial = 0x12345678
+    info.volume_label = 'café'
+    info.local_base_path = r'C:\résumé.txt'
+    stream = BytesIO()
+    info.write(stream)
+    data = stream.getvalue()
+    label = b'caf\xc3\xa9\x00'
+    path = b'C:\\r\xc3\xa9sum\xc3\xa9.txt\x00'
+    volume = pack('<4I', 16 + len(label), 3, 0x12345678, 16) + label
+    size, header_size, flags, volume_offset, path_offset, network_offset, suffix_offset = unpack_from('<7I', data)
+
+    assert header_size == 0x1C
+    assert flags == 1
+    assert volume_offset == header_size
+    assert network_offset == 0
+    assert path_offset == volume_offset + len(volume)
+    assert suffix_offset == path_offset + len(path)
+    assert size == len(data) == suffix_offset + 1
+    assert data[volume_offset:path_offset] == volume
+    assert data[path_offset:suffix_offset] == path
+    assert data[suffix_offset:] == b'\x00'
 
 
 @pytest.mark.parametrize(('filename', 'ansi_path', 'unicode_path'), [
