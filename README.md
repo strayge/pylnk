@@ -24,6 +24,10 @@ decodes them strictly using the current `pylnk3.utils.read_write.DEFAULT_CHARSET
 configure it for the shortcut's charset before JSON conversion. Invalid bytes
 raise a decoding error rather than being replaced or guessed.
 
+Zero FILETIME timestamps are `None` in Python and `null` in JSON; writing `None`
+emits zero. Nonzero FILETIMEs use naive local datetimes with microsecond precision
+(the final 100-nanosecond digit is discarded).
+
 ## CLI
 
 Mainly tool has two basic commands.

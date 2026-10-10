@@ -1,25 +1,20 @@
-import time
 from datetime import datetime
-from typing import Union
+from typing import Optional, Union
 
 
-def convert_time_to_unix(windows_time: int) -> datetime:
-    # Windows time is specified as the number of 0.1 nanoseconds since January 1, 1601.
-    # UNIX time is specified as the number of seconds since January 1, 1970.
-    # There are 134774 days (or 11644473600 seconds) between these dates.
-    unix_time = windows_time / 10000000.0 - 11644473600
-    try:
-        return datetime.fromtimestamp(unix_time)
-    except OSError:
-        return datetime.now()
+def convert_time_to_unix(windows_time: int) -> Optional[datetime]:
+    if windows_time == 0:
+        return None
+    # FILETIME counts 100-nanosecond ticks since 1601, 11644473600 seconds before Unix time.
+    seconds, ticks = divmod(windows_time, 10000000)
+    return datetime.fromtimestamp(seconds - 11644473600).replace(microsecond=ticks // 10)
 
 
-def convert_time_to_windows(unix_time: Union[int, datetime]) -> int:
+def convert_time_to_windows(unix_time: Optional[Union[int, float, datetime]]) -> int:
+    if unix_time is None:
+        return 0
     if isinstance(unix_time, datetime):
-        try:
-            unix_time_int = time.mktime(unix_time.timetuple())
-        except OverflowError:
-            unix_time_int = time.mktime(datetime.now().timetuple())
-    else:
-        unix_time_int = unix_time
-    return int((unix_time_int + 11644473600) * 10000000)
+        # timestamp() honors fold in repeated local hours; keep the fractional ticks separate.
+        seconds = int(unix_time.replace(microsecond=0).timestamp())
+        return (seconds + 11644473600) * 10000000 + unix_time.microsecond * 10
+    return 11644473600 * 10000000 + int(unix_time * 10000000)

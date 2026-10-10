@@ -49,8 +49,9 @@ class TypedPropertyValue:
         return buf.getvalue()
 
     @property
-    def value_decoded(self) -> str:
+    def value_decoded(self) -> Optional[Union[str, int]]:
         value = self.value
+        value_str: Optional[Union[str, int]]
         if self.type == 0x1F:
             size = value[:4]
             value_str = value[4:].decode('utf-16-le').rstrip('\u0000')
@@ -72,7 +73,8 @@ class TypedPropertyValue:
             low = read_int(stream)
             high = read_int(stream)
             num = (high << 32) + low
-            value_str = convert_time_to_unix(num).isoformat()
+            timestamp = convert_time_to_unix(num)
+            value_str = timestamp.isoformat() if timestamp is not None else None
         else:
             value_str = str(value)
         return value_str

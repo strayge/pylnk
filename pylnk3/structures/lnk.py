@@ -57,9 +57,9 @@ class Lnk(Serializable):
     def __init__(self) -> None:
         self.link_flags = LinkFlags()
         self.file_flags = FileFlags()
-        self.creation_time = datetime.now()
-        self.access_time = datetime.now()
-        self.modification_time = datetime.now()
+        self.creation_time: Optional[datetime] = datetime.now()
+        self.access_time: Optional[datetime] = datetime.now()
+        self.modification_time: Optional[datetime] = datetime.now()
         self.file_size = 0
         self.icon_index = 0
         self._show_command = WINDOW_NORMAL

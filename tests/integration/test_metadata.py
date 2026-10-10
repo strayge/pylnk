@@ -1,4 +1,3 @@
-import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -167,10 +166,6 @@ def test_localized_names_survive_roundtrip(examples_path: str) -> None:
     ] == expected
 
 
-@pytest.mark.xfail(
-    sys.platform in ('darwin', 'win32'), strict=True, raises=AssertionError,
-    reason='Unrepresentable FILETIME epoch values are replaced with current timestamps.',
-)
 def test_unset_timestamps_survive_roundtrip(examples_path: str) -> None:
     """Zero FILETIMEs are valid unset values and must not become current file activity."""
     data = (Path(examples_path) / 'uwp_calc.lnk').read_bytes()
@@ -183,13 +178,7 @@ def test_unset_timestamps_survive_roundtrip(examples_path: str) -> None:
     'timestamp',
     (
         datetime(2024, 1, 15, 12, 30, 40),
-        pytest.param(
-            datetime(2024, 1, 15, 12, 30, 40, 123456),
-            marks=pytest.mark.xfail(
-                strict=True, raises=AssertionError,
-                reason='FILETIME serialization drops datetime microseconds.',
-            ),
-        ),
+        datetime(2024, 1, 15, 12, 30, 40, 123456),
     ),
     ids=('whole-seconds', 'microseconds'),
 )
