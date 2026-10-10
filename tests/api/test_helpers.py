@@ -1,4 +1,5 @@
 from datetime import datetime
+from struct import unpack_from
 
 import pytest
 
@@ -16,17 +17,13 @@ def test_helpers_for_file(temp_filename: str) -> None:
     assert lnk2.path == path
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=KeyError,
-    reason="Documented FOLDER segments incorrectly require a size key",
-)
-def test_from_segment_list_folder_without_size() -> None:
+@pytest.mark.parametrize('segment_type', ['FOLDER', 'TYPE_FOLDER'])
+def test_from_segment_list_folder_without_size(segment_type: str) -> None:
     """Relative folders may omit file size without needing a drive entry."""
     timestamp = datetime(2020, 6, 8, 10, 12, 14)
     lnk = from_segment_list([
         {
-            'type': 'FOLDER',
+            'type': segment_type,
             'name': 'folder',
             'created': timestamp,
             'modified': timestamp,
@@ -41,24 +38,10 @@ def test_from_segment_list_folder_without_size() -> None:
 
 
 @pytest.mark.parametrize('segment_type, name, size, is_directory', [
-    pytest.param(
-        'FOLDER', 'folder', 0, True,
-        id='folder',
-        marks=pytest.mark.xfail(
-            strict=True,
-            raises=AssertionError,
-            reason="FOLDER segments do not set the serialized IsDirectory flag",
-        ),
-    ),
-    pytest.param(
-        'FILE', 'file.txt', 823, False,
-        id='file',
-        marks=pytest.mark.xfail(
-            strict=True,
-            raises=AssertionError,
-            reason="FILE segments do not set the serialized IsFile flag",
-        ),
-    ),
+    pytest.param('FOLDER', 'folder', 0, True, id='folder'),
+    pytest.param('FILE', 'file.txt', 823, False, id='file'),
+    pytest.param('TYPE_FOLDER', 'folder', 823, True, id='folder-alias'),
+    pytest.param('TYPE_FILE', 'file.txt', 823, False, id='file-alias'),
 ])
 def test_from_segment_list_type_flags(
     segment_type: str, name: str, size: int, is_directory: bool,
@@ -75,10 +58,34 @@ def test_from_segment_list_type_flags(
             'accessed': timestamp,
         },
     ])
+    entry = lnk.shell_item_id_list.items[0]
+    assert isinstance(entry, PathSegmentFileOrFolderEntry)
+    assert (entry.flags.IsDirectory, entry.flags.IsFile) == (is_directory, not is_directory)
+    assert entry.file_size == (0 if is_directory else size)
+    assert bool(unpack_from('<H', entry.bytes, 10)[0] & 0x10) == is_directory
+    assert lnk.file_flags.directory == is_directory
+
     parsed = Lnk.from_bytes(lnk.bytes())
     entry = parsed.shell_item_id_list.items[0]
     assert isinstance(entry, PathSegmentFileOrFolderEntry)
     assert (entry.flags.IsDirectory, entry.flags.IsFile) == (is_directory, not is_directory)
+    assert parsed.file_flags.directory == is_directory
+
+
+@pytest.mark.parametrize('segment_type', ['FILE', 'TYPE_FILE'])
+def test_from_segment_list_file_requires_size(segment_type: str) -> None:
+    """File sizes must remain explicit rather than silently defaulting to zero."""
+    timestamp = datetime(2020, 6, 8, 10, 12, 14)
+    with pytest.raises(KeyError, match='size'):
+        from_segment_list([
+            {
+                'type': segment_type,
+                'name': 'file.txt',
+                'created': timestamp,
+                'modified': timestamp,
+                'accessed': timestamp,
+            },
+        ])
 
 
 @pytest.mark.parametrize('name, is_file', [

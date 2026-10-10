@@ -116,14 +116,14 @@ def from_segment_list(
     The expected list for has the following format ("C:\\dir\\file.txt"):
 
     ['c:\\',
-     {'type': TYPE_FOLDER,
+     {'type': 'FOLDER',
       'size': 0,            # optional for folders
       'name': "dir",
       'created': datetime.datetime(2012, 10, 12, 23, 28, 11, 8476),
       'modified': datetime.datetime(2012, 10, 12, 23, 28, 11, 8476),
       'accessed': datetime.datetime(2012, 10, 12, 23, 28, 11, 8476)
      },
-     {'type': TYPE_FILE,
+     {'type': 'FILE',
       'size': 823,
       'name': "file.txt",
       'created': datetime.datetime(2012, 10, 12, 23, 28, 11, 8476),
@@ -151,7 +151,9 @@ def from_segment_list(
     data_without_root: List[Dict[str, Any]] = data  # type: ignore
     for level in data_without_root:
         segment = PathSegmentFileOrFolderEntry()
-        if level['type'] == 'TYPE_FOLDER':
+        segment.flags.IsDirectory = level['type'] in ('FOLDER', 'TYPE_FOLDER')
+        segment.flags.IsFile = level['type'] in ('FILE', 'TYPE_FILE')
+        if segment.flags.IsDirectory:
             segment.file_size = 0
         else:
             segment.file_size = level['size']
@@ -163,7 +165,7 @@ def from_segment_list(
         entries.append(segment)
     lnk.shell_item_id_list = LinkTargetIDList()
     lnk.shell_item_id_list.items = entries
-    if data_without_root[-1]['type'] == 'TYPE_FOLDER':
+    if data_without_root[-1]['type'] in ('FOLDER', 'TYPE_FOLDER'):
         lnk.file_flags.directory = True
     if lnk_name:
         lnk.save(lnk_name)
